@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSuperAdmin(uid) {
+      return exists(/databases/$(database)/documents/super_admins/$(uid));
+    }
+
+    function isAdmin(uid) {
+      return exists(/databases/$(database)/documents/admins/$(uid));
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ===== POSTS =====
+    match /posts/{postId} {
+      // Anyone can read approved public posts
+      allow read: if resource.data.status == 'approved' &&
+                     resource.data.visibility == 'public';
+
+      // Authenticated users can read all approved posts
+      allow read: if isAuthenticated() && resource.data.status == 'approved';
+
+      // SuperAdmin can read/manage all posts
+      allow read, update, delete: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+
+      // Authenticated users can create posts
+      allow create: if isAuthenticated();
+
+      // Author can update their own pending posts
+      allow update: if isAuthenticated() &&
+                       resource.data.authorId == request.auth.uid &&
+                       resource.data.status == 'pending';
+
+      // Likes subcollection
+      match /likes/{userId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && (
+          request.auth.uid == resource.data.userId ||
+          isSuperAdmin(request.auth.uid)
+        );
+
+        // Replies
+        match /replies/{replyId} {
+          allow read: if true;
+          allow create: if isAuthenticated();
+          allow update, delete: if isAuthenticated() && (
+            request.auth.uid == resource.data.userId ||
+            isSuperAdmin(request.auth.uid)
+          );
+
+          match /likes/{userId} {
+            allow read: if isAuthenticated();
+            allow write: if isAuthenticated() && request.auth.uid == userId;
+          }
+        }
+      }
+
+      // Viewers
+      match /viewers/{userId} {
+        allow read: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      // Shares
+      match /shares/{shareId} {
+        allow read: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // ===== FEEDS_USER_ONLY =====
+    match /feeds_user_only/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+                       request.resource.data.role == 'feeds_user';
+      allow read, update: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+      allow delete: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+    }
+
+    // ===== NOTIFICATIONS =====
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow write: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+      allow create: if isAuthenticated();
+    }
+
+    // ===== REPORTS =====
+    match /reports/{reportId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.reportedBy ||
+        isSuperAdmin(request.auth.uid)
+      );
+      allow update, delete: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+    }
+
+    // ===== ADMIN_LOGS =====
+    match /admin_logs/{logId} {
+      allow read, write: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+    }
+
+    // ===== APP_SETTINGS =====
+    match /app_settings/{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+    }
+
+    // ===== USERS_METADATA =====
+    match /users_metadata/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && isSuperAdmin(request.auth.uid);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['role', 'selectedRole']);
+    }
+
+    // ===== READ-ONLY: Role collections (for author resolution) =====
+    match /super_admins/{userId} {
+      allow read: if isAuthenticated();
+    }
+    match /admins/{userId} {
+      allow read: if isAuthenticated();
+    }
+    match /students/{userId} {
+      allow read: if isAuthenticated();
+    }
+    match /guardians/{userId} {
+      allow read: if isAuthenticated();
+    }
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

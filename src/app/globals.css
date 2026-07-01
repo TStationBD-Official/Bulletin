@@ -1,0 +1,367 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ── Utilities ──────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .reading-width {
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Loader dot bounce ────────────────────────────────────── */
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40%            { transform: translateY(-6px); opacity: 1; }
+}
+
+/* ── Page transition ──────────────────────────────────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.page {
+  animation: pageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Reading progress bar ────────────────────────────────── */
+@keyframes progress-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6 0%, #6366f1 100%);
+  z-index: 9999;
+  transition: width 0.1s linear;
+  animation: progress-enter 0.2s ease;
+}
+
+/* ── Post images ─────────────────────────────────────────── */
+.post-image {
+  transition: filter 0.5s ease-out;
+  filter: blur(8px);
+}
+.post-image.loaded {
+  filter: blur(0);
+}
+
+/* ── Article / Prose typography ──────────────────────────── */
+.article-body {
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  color: #1a1a1a;
+}
+.dark .article-body {
+  color: #c4d0de;
+}
+.article-body p {
+  margin-bottom: 1.5em;
+}
+.article-body h1,
+.article-body h2,
+.article-body h3,
+.article-body h4 {
+  font-weight: 700;
+  line-height: 1.25;
+  margin-top: 2.25em;
+  margin-bottom: 0.75em;
+  color: #111;
+  letter-spacing: -0.01em;
+}
+.dark .article-body h1,
+.dark .article-body h2,
+.dark .article-body h3,
+.dark .article-body h4 {
+  color: #f0f4f8;
+}
+.article-body h1 { font-size: 2rem; }
+.article-body h2 { font-size: 1.5rem; }
+.article-body h3 { font-size: 1.25rem; }
+.article-body h4 { font-size: 1.125rem; }
+.article-body a {
+  color: #3b82f6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.article-body a:hover {
+  color: #2563eb;
+}
+.article-body strong {
+  font-weight: 700;
+  color: inherit;
+}
+.article-body em {
+  font-style: italic;
+}
+.article-body blockquote {
+  border-left: 3px solid #3b82f6;
+  padding: 0.5em 0 0.5em 1.5em;
+  margin: 2em 0;
+  color: #525252;
+  font-style: italic;
+  font-size: 1.0625rem;
+}
+.dark .article-body blockquote {
+  border-left-color: #3b82f6;
+  color: #8ba1b8;
+}
+.article-body code {
+  background: #f3f4f6;
+  color: #dc2626;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875em;
+}
+.dark .article-body code {
+  background: #1e293b;
+  color: #f87171;
+}
+.article-body pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 1.25em 1.5em;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875em;
+  line-height: 1.7;
+  margin: 1.75em 0;
+}
+.article-body pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+.article-body ul, .article-body ol {
+  padding-left: 1.75em;
+  margin-bottom: 1.5em;
+}
+.article-body ul { list-style-type: disc; }
+.article-body ol { list-style-type: decimal; }
+.article-body li {
+  margin-bottom: 0.5em;
+}
+.article-body img {
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 2em auto;
+  display: block;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.10);
+}
+.article-body hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 3em 0;
+}
+.dark .article-body hr {
+  border-top-color: #334155;
+}
+
+/* Legacy prose class — keep for compat */
+.prose { font-size: 1rem; line-height: 1.75; }
+.prose p { margin-bottom: 1.25em; }
+.prose h1, .prose h2, .prose h3, .prose h4 { font-weight: 700; margin-top: 2em; margin-bottom: 0.75em; }
+.prose a { color: #3b82f6; text-decoration: underline; }
+.prose strong { font-weight: 700; }
+.prose ul, .prose ol { padding-left: 1.5em; margin-bottom: 1em; }
+.prose ul { list-style-type: disc; }
+.prose blockquote { border-left: 3px solid #e5e7eb; padding-left: 1em; color: #6b7280; font-style: italic; }
+.prose code { background: #f3f4f6; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.875em; }
+.prose pre { background: #0f172a; color: #e2e8f0; padding: 1em; border-radius: 8px; overflow-x: auto; }
+
+.dark .prose            { color: #c4d0de; }
+.dark .prose p          { color: #c4d0de; }
+.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4 { color: #f0f4f8; }
+.dark .prose strong     { color: #f0f4f8; }
+.dark .prose a          { color: #60a5fa; }
+.dark .prose blockquote { border-left-color: #243347; color: #8ba1b8; }
+.dark .prose code       { background-color: #1c2a3e; color: #f87171; }
+.dark .prose pre        { background-color: #0d1526; }
+
+/* ── Quill editor overrides ──────────────────────────────── */
+.ql-container.ql-snow,
+.ql-toolbar.ql-snow {
+  border: none !important;
+}
+.ql-toolbar.ql-snow {
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 8px 12px;
+  background: #fafafa;
+}
+.ql-container {
+  font-family: inherit;
+  font-size: 15px;
+}
+.ql-editor {
+  min-height: var(--quill-min-height, 200px);
+  padding: 16px 18px;
+  line-height: 1.7;
+}
+.ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+}
+.ql-toolbar button:hover,
+.ql-toolbar button.ql-active,
+.ql-toolbar.ql-snow button:hover,
+.ql-toolbar.ql-snow button.ql-active,
+.ql-snow.ql-toolbar button:hover,
+.ql-snow.ql-toolbar button.ql-active,
+.ql-snow.ql-toolbar button:focus {
+  color: #3b82f6 !important;
+}
+.ql-snow.ql-toolbar .ql-stroke,
+.ql-snow .ql-toolbar .ql-stroke {
+  stroke: currentColor;
+}
+.ql-toolbar.ql-snow .ql-picker-label {
+  color: #6b7280;
+}
+
+/* Dark mode Quill */
+.dark .ql-toolbar.ql-snow {
+  border-bottom-color: #243347 !important;
+  background-color: #1c2a3e;
+}
+.dark .ql-container {
+  background-color: #162032;
+  color: #f0f4f8;
+}
+.dark .ql-editor { color: #f0f4f8; }
+.dark .ql-editor.ql-blank::before { color: #5c7a96; }
+.dark .ql-toolbar.ql-snow .ql-picker-label,
+.dark .ql-toolbar.ql-snow .ql-picker-item { color: #8ba1b8; }
+.dark .ql-snow .ql-stroke { stroke: #8ba1b8; }
+.dark .ql-snow .ql-fill  { fill: #8ba1b8;  }
+.dark .ql-snow .ql-picker-options { background-color: #1c2a3e; border-color: #243347; }
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+.dark ::-webkit-scrollbar-thumb { background: #243347; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #2e4060; }
+
+/* ── Selection ────────────────────────────────────────────── */
+::selection {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: inherit;
+}
+
+/* ── Dark mode overrides ─────────────────────────────────── */
+/*
+ * Placed in @layer base so @layer utilities (which contains all dark:
+ * variant classes) always wins, regardless of file order.
+ * These are FALLBACKS for bare Tailwind classes (bg-white, text-gray-*)
+ * that have no explicit dark: companion in the component.
+ *
+ * Palette reference:
+ *   #0d1526  — page bg       (dark-bg)
+ *   #162032  — card          (dark-card)
+ *   #1c2a3e  — elevated card (dark-card-2)
+ *   #243347  — border        (dark-border)
+ *   #2e4060  — border-2      (dark-border-2)
+ *   #f0f4f8  — primary text  (dark-primary)
+ *   #c4d0de  — secondary     (dark-secondary)
+ *   #8ba1b8  — tertiary      (dark-tertiary)
+ *   #5c7a96  — muted         (dark-muted)
+ */
+
+.dark { color-scheme: dark; }
+
+@layer utilities {
+  /* ── Backgrounds ── */
+  .dark .bg-white        { background-color: #162032; }
+  .dark .bg-gray-50      { background-color: #0d1526; }
+  .dark .bg-gray-100     { background-color: #1c2a3e; }
+  .dark .bg-gray-200     { background-color: #243347; }
+
+  /* ── Text ── */
+  .dark .text-gray-950   { color: #f0f4f8; }
+  .dark .text-gray-900   { color: #f0f4f8; }
+  .dark .text-gray-800   { color: #dde6ef; }
+  .dark .text-gray-700   { color: #c4d0de; }
+  .dark .text-gray-600   { color: #a0b4c8; }
+  .dark .text-gray-500   { color: #8ba1b8; }
+  .dark .text-gray-400   { color: #6e89a0; }
+  .dark .text-gray-300   { color: #5c7a96; }
+
+  /* ── Borders ── */
+  .dark .border-gray-50  { border-color: #1c2a3e; }
+  .dark .border-gray-100 { border-color: #243347; }
+  .dark .border-gray-200 { border-color: #2e4060; }
+  .dark .border-b        { border-color: #243347; }
+  .dark .border-t        { border-color: #243347; }
+
+  .dark .divide-gray-50  > * + * { border-color: #1c2a3e; }
+  .dark .divide-gray-100 > * + * { border-color: #243347; }
+  .dark .divide-gray-200 > * + * { border-color: #2e4060; }
+
+  /* ── Hover surfaces ── */
+  .dark .hover\:bg-gray-50:hover  { background-color: #1c2a3e; }
+  .dark .hover\:bg-gray-100:hover { background-color: #243347; }
+  .dark .hover\:bg-gray-200:hover { background-color: #2e4060; }
+}
+
+/* ── Form controls (not in @layer base — needs to beat browser defaults) ── */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #162032;
+  border-color: #243347;
+  color: #f0f4f8;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #5c7a96; }
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+input:focus, textarea:focus, select:focus { outline: none; }
