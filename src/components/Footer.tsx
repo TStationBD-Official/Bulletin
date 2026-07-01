@@ -17,22 +17,22 @@ export default function Footer() {
 
   return (
     <footer className="border-t border-gray-100 dark:border-dark-border bg-white dark:bg-dark-bg mt-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+        <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:justify-between gap-3 sm:gap-6">
           {/* Brand */}
-          <div className="flex flex-col gap-2">
-            <Logo size={32} showName />
+          <div className="flex flex-col items-center sm:items-start gap-1.5 sm:gap-2">
+            <Logo size={28} showName />
             {description && (
-              <p className="text-[12px] text-gray-400 dark:text-dark-tertiary max-w-xs leading-relaxed">
+              <p className="text-[12px] text-gray-400 dark:text-dark-tertiary max-w-xs leading-relaxed hidden sm:block">
                 {description}
               </p>
             )}
           </div>
 
           {/* Right: links + copyright */}
-          <div className="flex flex-col items-start sm:items-end gap-3">
+          <div className="flex flex-col items-center sm:items-end gap-2">
             {policies.length > 0 && (
-              <nav className="flex items-center gap-5">
+              <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                 {policies.map(({ href, label }) => (
                   <Link
                     key={href}
@@ -44,8 +44,18 @@ export default function Footer() {
                 ))}
               </nav>
             )}
-            <p className="text-[12px] text-gray-400 dark:text-dark-muted">
-              © {new Date().getFullYear()} {siteTitle}. All rights reserved.
+            <p className="text-[12px] text-gray-400 dark:text-dark-muted flex items-center gap-1.5 flex-wrap justify-center">
+              <span>© {new Date().getFullYear()} {siteTitle}. All rights reserved.</span>
+              <span className="text-gray-200 dark:text-dark-muted">·</span>
+              <a
+                href="https://tuitioncore.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 hover:text-brand-500 dark:hover:text-brand-400 transition-colors"
+              >
+                <img src="/tuitioncore.png" alt="" className="w-3.5 h-3.5 rounded-sm object-cover flex-shrink-0" />
+                Powered by TuitionCore
+              </a>
             </p>
           </div>
         </div>

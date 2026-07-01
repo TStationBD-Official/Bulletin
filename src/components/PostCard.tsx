@@ -9,6 +9,7 @@ import { Post, AuthorProfile, Comment } from "@/types";
 import { relativeTime, readingTime, extractFirstImage, extractPlainText } from "@/lib/utils";
 import { likePost, unlikePost, savePost, unsavePost, sharePost, getRecentComments } from "@/lib/firestore";
 import { useStore } from "@/store/useStore";
+import { useActionCooldown } from "@/hooks/useActionCooldown";
 import ShareModal from "./ShareModal";
 import ReportModal from "./ReportModal";
 import toast from "react-hot-toast";
@@ -21,6 +22,8 @@ interface PostCardProps {
   isSaved?: boolean;
   onLikeChange?: (liked: boolean) => void;
   onSaveChange?: (saved: boolean) => void;
+  /** Skip the framer-motion mount animation when a scroll-triggered reveal (e.g. GSAP) drives this card instead */
+  disableMountAnimation?: boolean;
 }
 
 export default function PostCard({
@@ -31,6 +34,7 @@ export default function PostCard({
   isSaved = false,
   onLikeChange,
   onSaveChange,
+  disableMountAnimation = false,
 }: PostCardProps) {
   const router = useRouter();
   const { user, userRole, settings } = useStore();
@@ -45,6 +49,10 @@ export default function PostCard({
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
+  const likeCooldown  = useActionCooldown();
+  const saveCooldown   = useActionCooldown();
+  const shareCooldown  = useActionCooldown();
+
   const readMin  = readingTime(
     extractPlainText(post.richContent ?? null, post.richContent ?? post.content ?? "")
   );
@@ -52,44 +60,50 @@ export default function PostCard({
   const thumb    = extractFirstImage(post.imageUrls, post.richContent);
   const catColor = post.categoryColor ?? "#6366f1";
 
-  const handleLike = async (e: React.MouseEvent) => {
+  const handleLike = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!user) { toast.error("Sign in to like posts"); return; }
-    const next = !liked;
-    setLiked(next);
-    setLikeCount((c) => c + (next ? 1 : -1));
-    onLikeChange?.(next);
-    try {
-      if (next) await likePost(post.id, user.uid);
-      else await unlikePost(post.id, user.uid);
-    } catch {
-      setLiked(!next);
-      setLikeCount((c) => c + (next ? -1 : 1));
-    }
+    likeCooldown(async () => {
+      const next = !liked;
+      setLiked(next);
+      setLikeCount((c) => c + (next ? 1 : -1));
+      onLikeChange?.(next);
+      try {
+        if (next) await likePost(post.id, user.uid);
+        else await unlikePost(post.id, user.uid);
+      } catch {
+        setLiked(!next);
+        setLikeCount((c) => c + (next ? -1 : 1));
+      }
+    });
   };
 
-  const handleSave = async (e: React.MouseEvent) => {
+  const handleSave = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!user || userRole !== "feeds_user") {
       toast.error("Sign in as a website user to save posts");
       return;
     }
-    const next = !saved;
-    setSaved(next);
-    onSaveChange?.(next);
-    try {
-      if (next) await savePost(user.uid, post.id);
-      else await unsavePost(user.uid, post.id);
-      toast.success(next ? "Saved!" : "Removed from saved");
-    } catch {
-      setSaved(!next);
-    }
+    saveCooldown(async () => {
+      const next = !saved;
+      setSaved(next);
+      onSaveChange?.(next);
+      try {
+        if (next) await savePost(user.uid, post.id);
+        else await unsavePost(user.uid, post.id);
+        toast.success(next ? "Saved!" : "Removed from saved");
+      } catch {
+        setSaved(!next);
+      }
+    });
   };
 
-  const handleShare = async (e: React.MouseEvent) => {
+  const handleShare = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
-    if (user) await sharePost(post.id, user.uid).catch(() => {});
-    setShowShare(true);
+    shareCooldown(async () => {
+      if (user) await sharePost(post.id, user.uid).catch(() => {});
+      setShowShare(true);
+    });
   };
 
   const handleToggleComments = async (e: React.MouseEvent) => {
@@ -104,12 +118,20 @@ export default function PostCard({
     setShowComments((v) => !v);
   };
 
+  const ArticleTag = disableMountAnimation ? "article" : motion.article;
+  const articleMotionProps = disableMountAnimation
+    ? {}
+    : {
+        initial: { opacity: 0, y: 16 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.4, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] as const },
+      };
+
   return (
     <>
-      <motion.article
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
+      <ArticleTag
+        {...articleMotionProps}
+        data-post-card
         onClick={() => router.push(`/post/${post.id}`)}
         className="group flex flex-col p-5 md:p-6 mb-3 bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border cursor-pointer hover:border-gray-200 dark:hover:border-dark-border/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
       >
@@ -309,7 +331,7 @@ export default function PostCard({
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.article>
+      </ArticleTag>
 
       {showShare  && <ShareModal  postId={post.id} onClose={() => setShowShare(false)} />}
       {showReport && <ReportModal postId={post.id} postTitle={post.title} onClose={() => setShowReport(false)} />}

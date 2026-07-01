@@ -23,6 +23,9 @@ import { PageLoader } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 import toast from "react-hot-toast";
 import { QuillDeltaToHtmlConverter } from "quill-delta-to-html";
+import { BentoGrid, BentoTile } from "@/components/BentoGrid";
+import { gsap, ScrollTrigger } from "@/lib/gsap";
+import { useActionCooldown } from "@/hooks/useActionCooldown";
 
 export default function PostPage() {
   const params = useParams();
@@ -40,18 +43,35 @@ export default function PostPage() {
   const [saved,       setSaved]       = useState(false);
   const [showShare,   setShowShare]   = useState(false);
   const [showReport,  setShowReport]  = useState(false);
-  const [progress,    setProgress]    = useState(0);
+
+  const barRef     = useRef<HTMLDivElement>(null);
+  const articleRef = useRef<HTMLElement>(null);
+
+  const likeCooldown = useActionCooldown();
+  const saveCooldown  = useActionCooldown();
 
   /* ── Reading progress ─────────────────────────────────── */
   useEffect(() => {
-    const onScroll = () => {
-      const scrolled  = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(docHeight > 0 ? Math.min(100, (scrolled / docHeight) * 100) : 0);
+    if (!barRef.current || !articleRef.current) return;
+
+    gsap.set(barRef.current, { scaleX: 0 });
+
+    const st = ScrollTrigger.create({
+      trigger: articleRef.current,
+      start: "top top",
+      end: "bottom bottom",
+      scrub: true,
+      onUpdate: (self) => gsap.set(barRef.current, { scaleX: self.progress }),
+    });
+
+    const onLoad = () => ScrollTrigger.refresh();
+    window.addEventListener("load", onLoad);
+
+    return () => {
+      st.kill();
+      window.removeEventListener("load", onLoad);
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [postId, post]);
 
   /* ── Load post ────────────────────────────────────────── */
   useEffect(() => {
@@ -94,35 +114,39 @@ export default function PostPage() {
     })();
   }, [postId, user?.uid]);
 
-  const handleLike = async () => {
+  const handleLike = () => {
     if (!user) { toast.error("Sign in to like posts"); return; }
-    const next = !liked;
-    setLiked(next);
-    setLikeCount((c) => c + (next ? 1 : -1));
-    setPost((p) => p ? { ...p, likes: p.likes + (next ? 1 : -1) } : null);
-    try {
-      if (next) await likePost(postId, user.uid);
-      else await unlikePost(postId, user.uid);
-    } catch {
-      setLiked(!next);
-      setLikeCount((c) => c + (next ? -1 : 1));
-    }
+    likeCooldown(async () => {
+      const next = !liked;
+      setLiked(next);
+      setLikeCount((c) => c + (next ? 1 : -1));
+      setPost((p) => p ? { ...p, likes: p.likes + (next ? 1 : -1) } : null);
+      try {
+        if (next) await likePost(postId, user.uid);
+        else await unlikePost(postId, user.uid);
+      } catch {
+        setLiked(!next);
+        setLikeCount((c) => c + (next ? -1 : 1));
+      }
+    });
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!user || userRole !== "feeds_user") {
       toast.error("Sign in as a website user to save posts");
       return;
     }
-    const next = !saved;
-    setSaved(next);
-    try {
-      if (next) await savePost(user.uid, postId);
-      else await unsavePost(user.uid, postId);
-      toast.success(next ? "Post saved!" : "Removed from saved");
-    } catch {
-      setSaved(!next);
-    }
+    saveCooldown(async () => {
+      const next = !saved;
+      setSaved(next);
+      try {
+        if (next) await savePost(user.uid, postId);
+        else await unsavePost(user.uid, postId);
+        toast.success(next ? "Post saved!" : "Removed from saved");
+      } catch {
+        setSaved(!next);
+      }
+    });
   };
 
   if (loading) return <PageLoader />;
@@ -135,10 +159,7 @@ export default function PostPage() {
   return (
     <>
       {/* ── Reading progress bar ─────────────────────────── */}
-      <div
-        className="reading-progress"
-        style={{ width: `${progress}%` }}
-      />
+      <div ref={barRef} className="reading-progress" />
 
       <main className="page min-h-screen bg-white dark:bg-dark-bg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -215,7 +236,7 @@ export default function PostPage() {
             </div>
 
             {/* ── Article ────────────────────────────────── */}
-            <article className="min-w-0 reading-width w-full">
+            <article ref={articleRef} className="min-w-0 reading-width w-full">
               {/* Back */}
               <Link
                 href="/"
@@ -365,7 +386,7 @@ export default function PostPage() {
 
               {/* ── Author card ──────────────────────────── */}
               {author && (
-                <div className="mt-10 p-4 sm:p-6 border border-gray-100 dark:border-dark-border rounded-2xl flex items-start gap-3 sm:gap-4 bg-gray-50/60 dark:bg-dark-card/60">
+                <BentoTile className="mt-10 flex items-start gap-3 sm:gap-4 bg-gray-50/60 dark:bg-dark-card/60 p-4 sm:p-6">
                   <Link href={`/author/${post.authorId}`}>
                     <motion.div
                       whileHover={{ scale: 1.06 }}
@@ -393,7 +414,7 @@ export default function PostPage() {
                       <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-1 leading-relaxed line-clamp-3">{(author as any).bio}</p>
                     )}
                   </div>
-                </div>
+                </BentoTile>
               )}
 
               {/* ── Comments ─────────────────────────────── */}
@@ -404,35 +425,28 @@ export default function PostPage() {
 
             {/* ── Right sidebar (xl only) ─────────────── */}
             <div className="hidden xl:block sticky top-28">
-              <div className="space-y-6">
-                <div className="bg-gray-50/80 dark:bg-dark-card rounded-2xl p-5 border border-gray-100 dark:border-dark-border">
-                  <h4 className="text-[11px] font-bold text-gray-400 dark:text-dark-tertiary uppercase tracking-widest mb-4">Stats</h4>
-                  <div className="space-y-3">
-                    {[
-                      { icon: <Heart size={14} />, label: "Likes",    value: likeCount },
-                      { icon: <MessageCircle size={14} />, label: "Comments", value: post.comments },
-                      { icon: <Eye size={14} />, label: "Views",    value: post.views },
-                      { icon: <Share2 size={14} />, label: "Shares",   value: post.shares },
-                    ].map(({ icon, label, value }) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-gray-400 dark:text-dark-tertiary text-sm">
-                          {icon} {label}
-                        </div>
-                        <span className="text-sm font-bold text-gray-900 dark:text-dark-primary">{value.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="text-[12px] text-gray-400 dark:text-dark-tertiary space-y-1.5">
+              <BentoGrid cols="grid-cols-2" className="gap-3">
+                {[
+                  { icon: <Heart size={14} />, label: "Likes", value: likeCount },
+                  { icon: <MessageCircle size={14} />, label: "Comments", value: post.comments },
+                  { icon: <Eye size={14} />, label: "Views", value: post.views },
+                  { icon: <Share2 size={14} />, label: "Shares", value: post.shares },
+                ].map(({ icon, label, value }) => (
+                  <BentoTile key={label} className="flex flex-col items-center justify-center text-center gap-1.5 p-4">
+                    <div className="text-gray-400 dark:text-dark-tertiary">{icon}</div>
+                    <span className="text-lg font-bold text-gray-900 dark:text-dark-primary">{value.toLocaleString()}</span>
+                    <span className="text-[11px] text-gray-400 dark:text-dark-tertiary">{label}</span>
+                  </BentoTile>
+                ))}
+                <BentoTile bare colSpan="col-span-2" className="text-[12px] text-gray-400 dark:text-dark-tertiary space-y-1.5 px-1">
                   <div className="flex items-center gap-1.5">
                     <Calendar size={12} /> Published {formatDate(post.createdAt)}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Clock size={12} /> {readMin} min read
                   </div>
-                </div>
-              </div>
+                </BentoTile>
+              </BentoGrid>
             </div>
           </div>
         </div>

@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
-  subscribeToLatestPosts,
-  getMorePosts,
+  getLatestPostsPage,
   resolveAuthor,
-  getTrendingPosts,
+  getWeeklyTrendingPosts,
+  getMonthlyTrendingPosts,
   getTopAuthors,
 } from "@/lib/firestore";
 import { getCategories, SEED_CATEGORIES } from "@/lib/categories";
-import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile, Category } from "@/types";
-import { toDate, readingTime } from "@/lib/utils";
+import { toDate } from "@/lib/utils";
 import PostCard from "@/components/PostCard";
 import EmptyState from "@/components/EmptyState";
 import { PageLoader } from "@/components/LoadingSpinner";
@@ -21,7 +21,7 @@ import { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import Link from "next/link";
 import {
   ArrowLeft, Calendar, X, ChevronDown,
-  TrendingUp, Users, ArrowRight, User, Heart,
+  TrendingUp, Users, ArrowRight, User, Heart, MessageCircle, Share2,
 } from "lucide-react";
 
 type QuickRange = "all" | "today" | "week" | "month" | "year";
@@ -47,22 +47,56 @@ function toInputValue(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
+function TrendingList({
+  title,
+  posts,
+}: {
+  title: string;
+  posts: Post[];
+}) {
+  if (posts.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <TrendingUp size={14} className="text-gray-400 dark:text-dark-tertiary" />
+        <h3 className="text-xs font-bold text-gray-500 dark:text-dark-tertiary uppercase tracking-widest">
+          {title}
+        </h3>
+      </div>
+      <div className="space-y-5">
+        {posts.map((post, i) => (
+          <Link key={post.id} href={`/post/${post.id}`} className="group flex gap-3">
+            <span className="text-2xl font-black flex-shrink-0 w-6 text-center leading-none pt-1" style={{ color: "#94a3b8" }}>
+              {i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-[13px] font-bold text-gray-900 dark:text-dark-primary line-clamp-1 leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                {post.title || "Untitled"}
+              </h4>
+              <p className="text-[12px] text-gray-500 dark:text-dark-tertiary mt-1 line-clamp-2 leading-snug">
+                {post.content?.replace(/<[^>]*>/g, "")}
+              </p>
+              <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400 dark:text-dark-tertiary">
+                <span className="flex items-center gap-1"><Heart size={11} /> {post.likes}</span>
+                <span className="flex items-center gap-1"><MessageCircle size={11} /> {post.comments}</span>
+                <span className="flex items-center gap-1"><Share2 size={11} /> {post.shares}</span>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AllPostsPage() {
   const searchParams   = useSearchParams();
   const router         = useRouter();
   const query          = searchParams.get("q")?.toLowerCase() || "";
   const categoryFilter = searchParams.get("c") || null;
 
-  const { user, userRole, userData } = useStore();
-
-  const [posts,        setPosts]        = useState<Post[]>([]);
-  const [trending,     setTrending]     = useState<Post[]>([]);
-  const [topAuthors,   setTopAuthors]   = useState<Array<AuthorProfile & { totalEngagement: number; totalPosts: number }>>([]);
-  const [authorCache,  setAuthorCache]  = useState<Record<string, AuthorProfile | null>>({});
-  const [loading,      setLoading]      = useState(true);
-  const [hasMore,      setHasMore]      = useState(true);
-  const [loadingMore,  setLoadingMore]  = useState(false);
-  const [categories,   setCategories]   = useState<Category[]>([]);
+  const [authorCache, setAuthorCache] = useState<Record<string, AuthorProfile | null>>({});
 
   // Date filter state
   const [quickRange,  setQuickRange]  = useState<QuickRange>("all");
@@ -70,8 +104,6 @@ export default function AllPostsPage() {
   const [pickerTo,    setPickerTo]    = useState("");
   const [showPicker,  setShowPicker]  = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-
-  const lastDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   // Close picker on outside click
   useEffect(() => {
@@ -84,43 +116,34 @@ export default function AllPostsPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    let unsub: (() => void) | null = null;
-    (async () => {
-      try {
-        const adminGroupId: string | null =
-          userRole === "admin" && user ? user.uid
-          : (userRole === "student" || userRole === "guardian") && userData
-          ? (userData as any)?.adminId ?? null : null;
+  const {
+    data: postsPages,
+    isLoading: postsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["postsArchive"],
+    queryFn: ({ pageParam }) => getLatestPostsPage(10, pageParam),
+    initialPageParam: undefined as QueryDocumentSnapshot<DocumentData> | undefined,
+    getNextPageParam: (last) => last.lastDoc ?? undefined,
+  });
+  const posts = useMemo(() => postsPages?.pages.flatMap((p) => p.posts) ?? [], [postsPages]);
 
-        unsub = subscribeToLatestPosts(
-          (p) => { setPosts(p); lastDocRef.current = null; },
-          { adminGroupId: adminGroupId ?? undefined, isSuperAdmin: userRole === "superAdmin" },
-          50
-        );
+  const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const cats = await getCategories().catch(() => []);
+      return cats.length > 0 ? cats : (SEED_CATEGORIES as any as Category[]);
+    },
+  });
+  const categories = categoriesData ?? [];
 
-        const [cats, trendingPosts, authors] = await Promise.all([
-          getCategories().catch(() => []),
-          getTrendingPosts(),
-          getTopAuthors(),
-        ]);
+  const { data: weeklyTrending = [] } = useQuery({ queryKey: ["trending", "weekly"], queryFn: getWeeklyTrendingPosts });
+  const { data: monthlyTrending = [] } = useQuery({ queryKey: ["trending", "monthly"], queryFn: getMonthlyTrendingPosts });
+  const { data: topAuthors = [] } = useQuery({ queryKey: ["topAuthors"], queryFn: getTopAuthors });
 
-        setCategories(cats.length > 0 ? cats : (SEED_CATEGORIES as any));
-        setTrending(trendingPosts);
-        setTopAuthors(authors);
-
-        // Resolve authors for trending sidebar
-        const trendIds = Array.from(new Set(trendingPosts.map((p) => p.authorId)));
-        const resolved: Record<string, AuthorProfile | null> = {};
-        await Promise.all(trendIds.map(async (id) => { resolved[id] = await resolveAuthor(id); }));
-        setAuthorCache((prev) => ({ ...prev, ...resolved }));
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => unsub?.();
-  }, [user?.uid, userRole]);
+  const loading = postsLoading || categoriesLoading;
 
   useEffect(() => {
     const missing = posts.filter((p) => !authorCache[p.authorId]);
@@ -132,19 +155,6 @@ export default function AllPostsPage() {
       setAuthorCache((prev) => ({ ...prev, ...entries }));
     })();
   }, [posts]);
-
-  const handleLoadMore = async () => {
-    if (!lastDocRef.current || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const { posts: newPosts, lastDoc } = await getMorePosts(lastDocRef.current);
-      if (newPosts.length < 20) setHasMore(false);
-      setPosts((p) => [...p, ...newPosts]);
-      lastDocRef.current = lastDoc;
-    } finally {
-      setLoadingMore(false);
-    }
-  };
 
   const applyCustomRange = () => {
     if (pickerFrom || pickerTo) setQuickRange("all");
@@ -398,14 +408,14 @@ export default function AllPostsPage() {
                   />
                 ))}
 
-                {hasMore && !isDateFiltered && (
+                {hasNextPage && !isDateFiltered && (
                   <div className="flex justify-center pt-8">
                     <button
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
                       className="flex items-center gap-2 px-6 py-2.5 border border-gray-200 dark:border-dark-border text-sm font-semibold text-gray-700 dark:text-dark-primary rounded-full hover:bg-gray-50 dark:hover:bg-dark-card disabled:opacity-50 transition-colors"
                     >
-                      {loadingMore ? (
+                      {isFetchingNextPage ? (
                         <>
                           <motion.div
                             animate={{ rotate: 360 }}
@@ -428,52 +438,19 @@ export default function AllPostsPage() {
           <aside className="hidden lg:block">
             <div className="sticky top-28 space-y-8">
 
-              {/* Trending */}
-              {trending.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp size={14} className="text-gray-400 dark:text-dark-tertiary" />
-                    <h3 className="text-xs font-bold text-gray-500 dark:text-dark-tertiary uppercase tracking-widest">
-                      Trending
-                    </h3>
-                  </div>
-                  <div className="space-y-5">
-                    {trending.map((post, i) => {
-                      const trendAuthor = authorCache[post.authorId];
-                      return (
-                        <Link key={post.id} href={`/post/${post.id}`} className="group flex gap-3">
-                          <span className="text-2xl font-black flex-shrink-0 w-6 text-center leading-none pt-1" style={{ color: "#94a3b8" }}>
-                            {i + 1}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <div className="w-4 h-4 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0">
-                                {trendAuthor?.profileImageUrl ? (
-                                  <img src={trendAuthor.profileImageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                ) : (
-                                  <div className="w-full h-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center">
-                                    <User size={8} className="text-brand-500" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-[11px] font-semibold text-gray-600 dark:text-dark-secondary truncate">{post.authorName}</span>
-                            </div>
-                            <h4 className="text-[13px] font-bold text-gray-900 dark:text-dark-primary line-clamp-2 leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                              {post.title || post.content?.replace(/<[^>]*>/g, "").slice(0, 60)}
-                            </h4>
-                            <p className="text-[11px] text-gray-400 dark:text-dark-tertiary mt-1">
-                              {readingTime(post.content || "")} min · <span className="inline-flex items-center gap-1"><Heart size={9} className="inline" /> {post.likes}</span>
-                            </p>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Weekly Trending */}
+              <TrendingList title="Weekly Trending" posts={weeklyTrending} />
 
               {/* Divider */}
-              {trending.length > 0 && topAuthors.length > 0 && (
+              {weeklyTrending.length > 0 && monthlyTrending.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-dark-border" />
+              )}
+
+              {/* Monthly Trending */}
+              <TrendingList title="Monthly Trending" posts={monthlyTrending} />
+
+              {/* Divider */}
+              {(weeklyTrending.length > 0 || monthlyTrending.length > 0) && topAuthors.length > 0 && (
                 <div className="border-t border-gray-100 dark:border-dark-border" />
               )}
 

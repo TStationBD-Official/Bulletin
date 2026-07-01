@@ -2,6 +2,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -23,3 +24,20 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope("https://www.googleapis.com/auth/userinfo.email");
 googleProvider.addScope("https://www.googleapis.com/auth/userinfo.profile");
 googleProvider.addScope("https://www.googleapis.com/auth/drive.file");
+
+// App Check: attaches a verified-client token to Firestore/Storage requests so
+// scripted traffic without a real reCAPTCHA-passing browser can be rejected once
+// enforcement is turned on in the Firebase Console. Safe no-op until
+// NEXT_PUBLIC_RECAPTCHA_SITE_KEY is configured — see .env.example.
+if (typeof window !== "undefined") {
+  if (process.env.NODE_ENV !== "production") {
+    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+  if (recaptchaSiteKey) {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
+}

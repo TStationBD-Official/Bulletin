@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import {
-  getTrendingPosts,
+  getWeeklyTrendingPosts,
+  getMonthlyTrendingPosts,
   getTopAuthors,
   subscribeToLatestPosts,
   resolveAuthor,
@@ -16,8 +18,11 @@ import PostCard from "@/components/PostCard";
 import EmptyState from "@/components/EmptyState";
 import { PageLoader } from "@/components/LoadingSpinner";
 import Link from "next/link";
-import { TrendingUp, Users, ArrowRight, User, Heart } from "lucide-react";
-import { relativeTime, readingTime } from "@/lib/utils";
+import { Users, ArrowRight, User } from "lucide-react";
+import { relativeTime } from "@/lib/utils";
+import { BentoGrid, BentoTile } from "@/components/BentoGrid";
+import TrendingBox from "@/components/TrendingBox";
+import { gsap, ScrollTrigger } from "@/lib/gsap";
 
 export default function FeedPage() {
   const searchParams = useSearchParams();
@@ -28,53 +33,74 @@ export default function FeedPage() {
   const { user, userRole, userData } = useStore();
 
   const [posts,       setPosts]       = useState<Post[]>([]);
-  const [trending,    setTrending]    = useState<Post[]>([]);
-  const [topAuthors,  setTopAuthors]  = useState<Array<AuthorProfile & { totalEngagement: number; totalPosts: number }>>([]);
   const [authorCache, setAuthorCache] = useState<Record<string, AuthorProfile | null>>({});
-  const [loading,    setLoading]    = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
 
-  /* ── Initial data load ──────────────────────────────────── */
+  const { data: weeklyTrending = [] }  = useQuery({ queryKey: ["trending", "weekly"],  queryFn: getWeeklyTrendingPosts });
+  const { data: monthlyTrending = [] } = useQuery({ queryKey: ["trending", "monthly"], queryFn: getMonthlyTrendingPosts });
+  const { data: topAuthors = [] }      = useQuery({ queryKey: ["topAuthors"], queryFn: getTopAuthors });
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const cats = await getCategories().catch(() => []);
+      return cats.length > 0 ? cats : (SEED_CATEGORIES as any as Category[]);
+    },
+  });
+
+  const loading = postsLoading || categoriesLoading;
+
+  const bannerRef        = useRef<HTMLDivElement>(null);
+  const circleTopRef     = useRef<HTMLDivElement>(null);
+  const circleBottomRef  = useRef<HTMLDivElement>(null);
+
+  /* ── Banner parallax ─────────────────────────────────────── */
   useEffect(() => {
-    setLoading(true);
-    let unsub: (() => void) | null = null;
+    if (!bannerRef.current) return;
 
-    (async () => {
-      try {
-        const adminGroupId: string | null =
-          userRole === "admin" && user
-            ? user.uid
-            : (userRole === "student" || userRole === "guardian") && userData
-            ? (userData as any)?.adminId ?? null
-            : null;
+    const ctx = gsap.context(() => {
+      gsap.to(circleTopRef.current, {
+        yPercent: 40,
+        ease: "none",
+        scrollTrigger: {
+          trigger: bannerRef.current,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: true,
+        },
+      });
+      gsap.to(circleBottomRef.current, {
+        yPercent: -25,
+        ease: "none",
+        scrollTrigger: {
+          trigger: bannerRef.current,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: true,
+        },
+      });
+    }, bannerRef);
 
-        unsub = subscribeToLatestPosts(
-          (p) => { setPosts(p); },
-          { adminGroupId: adminGroupId ?? undefined, isSuperAdmin: userRole === "superAdmin" },
-          5
-        );
+    return () => ctx.revert();
+  }, []);
 
-        const [trendingPosts, authors, cats] = await Promise.all([
-          getTrendingPosts(),
-          getTopAuthors(),
-          getCategories().catch(() => []),
-        ]);
+  /* ── Real-time feed subscription ──────────────────────────── */
+  useEffect(() => {
+    setPostsLoading(true);
 
-        setCategories(cats.length > 0 ? cats : (SEED_CATEGORIES as any));
-        setTrending(trendingPosts);
-        setTopAuthors(authors);
+    const adminGroupId: string | null =
+      userRole === "admin" && user
+        ? user.uid
+        : (userRole === "student" || userRole === "guardian") && userData
+        ? (userData as any)?.adminId ?? null
+        : null;
 
-        // Resolve authors for trending
-        const ids = Array.from(new Set(trendingPosts.map((p) => p.authorId)));
-        const resolved: Record<string, AuthorProfile | null> = {};
-        await Promise.all(ids.map(async (id) => { resolved[id] = await resolveAuthor(id); }));
-        setAuthorCache(resolved);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    const unsub = subscribeToLatestPosts(
+      (p) => { setPosts(p); setPostsLoading(false); },
+      { adminGroupId: adminGroupId ?? undefined, isSuperAdmin: userRole === "superAdmin" },
+      5
+    );
 
-    return () => unsub?.();
+    return () => unsub();
   }, [user?.uid, userRole]);
 
   /* ── Resolve authors for feed posts ─────────────────────── */
@@ -96,7 +122,42 @@ export default function FeedPage() {
     return matchQuery && matchCategory;
   });
 
-  const activeCategory = categories.find((c) => c.id === categoryFilter);
+  const feedColumnRef = useRef<HTMLDivElement>(null);
+  const postIdsKey = filteredPosts.map((p) => p.id).join(",");
+
+  /* ── Feed card reveal on scroll ───────────────────────────── */
+  useLayoutEffect(() => {
+    if (filteredPosts.length === 0) return;
+
+    const ctx = gsap.context(() => {
+      const mm = gsap.matchMedia();
+
+      const setupBatch = (scroller?: HTMLElement) => {
+        const cards = gsap.utils.toArray<HTMLElement>("[data-post-card]", feedColumnRef.current);
+        if (cards.length === 0) return;
+        gsap.set(cards, { opacity: 0, y: 16 });
+        ScrollTrigger.batch(cards, {
+          scroller,
+          start: "top 90%",
+          once: true,
+          onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08, overwrite: true }),
+        });
+      };
+
+      mm.add("(min-width: 1024px)", () => setupBatch(feedColumnRef.current ?? undefined));
+      mm.add("(max-width: 1023.98px)", () => setupBatch(undefined));
+
+      return () => mm.revert();
+    }, feedColumnRef);
+
+    const id = requestAnimationFrame(() => ScrollTrigger.refresh());
+
+    return () => {
+      cancelAnimationFrame(id);
+      ctx.revert();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postIdsKey]);
 
   if (loading) return <PageLoader />;
 
@@ -108,6 +169,43 @@ export default function FeedPage() {
      * On mobile: normal page scroll (min-h-screen, no overflow restriction).
      */
     <main className="bg-gray-50/50 dark:bg-dark-bg min-h-screen lg:h-[calc(100vh-4rem)] lg:flex lg:flex-col lg:overflow-hidden">
+
+      {/* ── TuitionCore promo banner ──────────────────────────── */}
+      <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4">
+        <div ref={bannerRef} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 shadow-lg shadow-brand-500/20 px-4 py-4 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-center gap-3 sm:gap-6">
+          <div ref={circleTopRef} className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+          <div ref={circleBottomRef} className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+
+          <div className="relative flex-1 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left">
+            <img
+              src="/tuitioncore.png"
+              alt="TuitionCore"
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover flex-shrink-0 ring-2 ring-white/30 bg-white/10"
+            />
+            <div>
+              <span className="inline-block text-[10px] sm:text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">
+                Powered by TuitionCore
+              </span>
+              <h2 className="text-base sm:text-xl font-bold text-white leading-snug">
+                Bulletin runs on TuitionCore — a complete system to manage students
+              </h2>
+              <p className="text-[13px] sm:text-sm text-white/80 mt-1">
+                Attendance, performance, fees and communication, all in one place for tutors and admins.
+              </p>
+            </div>
+          </div>
+
+          <a
+            href="https://tuitioncore.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative w-full sm:w-auto flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white text-brand-700 text-sm font-bold rounded-xl hover:bg-brand-50 active:scale-95 transition-all shadow-sm"
+          >
+            Know more
+            <ArrowRight size={15} />
+          </a>
+        </div>
+      </div>
 
       {/* ── Category tabs ─────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-white/90 dark:bg-dark-bg/90 backdrop-blur-xl border-b border-gray-100 dark:border-dark-border z-30 sticky top-16 lg:static">
@@ -150,7 +248,7 @@ export default function FeedPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-8 xl:gap-12 lg:h-full">
 
             {/* ── Feed — independent scroll ─────────────────────── */}
-            <div className="lg:overflow-y-auto lg:h-full py-6 scrollbar-hide">
+            <div ref={feedColumnRef} className="lg:overflow-y-auto lg:h-full py-6 scrollbar-hide">
 
               {/* Search banner */}
               {query && (
@@ -163,23 +261,6 @@ export default function FeedPage() {
                     )}
                   </p>
                 </div>
-              )}
-
-              {/* Category header */}
-              {activeCategory && !query && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-4 mb-6 px-5 py-4 bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border"
-                >
-                  <span className="text-4xl">{activeCategory.icon}</span>
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-dark-primary">{activeCategory.name}</h1>
-                    {activeCategory.description && (
-                      <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-0.5">{activeCategory.description}</p>
-                    )}
-                  </div>
-                </motion.div>
               )}
 
               {filteredPosts.length === 0 ? (
@@ -197,6 +278,7 @@ export default function FeedPage() {
                       post={post}
                       author={authorCache[post.authorId]}
                       index={i}
+                      disableMountAnimation
                     />
                   ))}
                   <div className="flex justify-center pt-6 pb-8">
@@ -214,60 +296,17 @@ export default function FeedPage() {
 
             {/* ── Sidebar — independent scroll ──────────────────── */}
             <aside className="hidden lg:flex lg:flex-col lg:overflow-y-auto lg:h-full py-6 scrollbar-hide">
-              <div className="space-y-4 pb-8">
+              <BentoGrid cols="grid-cols-1" className="pb-8">
 
-                {/* Trending */}
-                {trending.length > 0 && (
-                  <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border p-5">
-                    <div className="flex items-center gap-2 mb-5">
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center">
-                        <TrendingUp size={13} className="text-orange-500" />
-                      </div>
-                      <h3 className="text-xs font-bold text-gray-900 dark:text-dark-primary uppercase tracking-widest">
-                        Trending
-                      </h3>
-                    </div>
-                    <div className="space-y-5">
-                      {trending.map((post, i) => {
-                        const trendAuthor = authorCache[post.authorId];
-                        return (
-                          <Link key={post.id} href={`/post/${post.id}`} className="group flex gap-3.5 items-start">
-                            <span className="text-xl font-black flex-shrink-0 w-5 text-center leading-tight mt-0.5 tabular-nums" style={{ color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : "#cbd5e1" }}>
-                              {i + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 mb-1.5">
-                                <div className="w-4 h-4 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0">
-                                  {trendAuthor?.profileImageUrl ? (
-                                    <img src={trendAuthor.profileImageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                  ) : (
-                                    <div className="w-full h-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center">
-                                      <User size={8} className="text-brand-500" />
-                                    </div>
-                                  )}
-                                </div>
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-dark-tertiary truncate">{post.authorName}</span>
-                              </div>
-                              <h4 className="text-[13px] font-semibold text-gray-900 dark:text-dark-primary line-clamp-2 leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                                {post.title || post.content?.replace(/<[^>]*>/g, "").slice(0, 60)}
-                              </h4>
-                              <p className="text-[11px] text-gray-400 dark:text-dark-tertiary mt-1.5 flex items-center gap-1.5">
-                                <Heart size={9} />
-                                {post.likes}
-                                <span className="text-gray-200 dark:text-dark-muted">·</span>
-                                {readingTime(post.content || "")} min read
-                              </p>
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                {/* Weekly Trending */}
+                <TrendingBox title="Weekly Trending" posts={weeklyTrending} />
+
+                {/* Monthly Trending */}
+                <TrendingBox title="Monthly Trending" posts={monthlyTrending} />
 
                 {/* Top Authors */}
                 {topAuthors.length > 0 && (
-                  <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border p-5">
+                  <BentoTile className="p-5">
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-brand-100 to-indigo-100 dark:from-brand-900/30 dark:to-indigo-900/30 flex items-center justify-center">
                         <Users size={13} className="text-brand-500" />
@@ -304,11 +343,11 @@ export default function FeedPage() {
                         </Link>
                       ))}
                     </div>
-                  </div>
+                  </BentoTile>
                 )}
 
                 {/* Write CTA */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-brand-600 to-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-brand-500/20">
+                <BentoTile bare className="relative overflow-hidden bg-gradient-to-br from-brand-600 to-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-brand-500/20">
                   <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
                   <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
                   <div className="relative">
@@ -324,9 +363,9 @@ export default function FeedPage() {
                       <ArrowRight size={12} />
                     </Link>
                   </div>
-                </div>
+                </BentoTile>
 
-              </div>
+              </BentoGrid>
             </aside>
 
           </div>

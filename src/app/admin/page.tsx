@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -31,34 +32,72 @@ import {
   EngagementTrendChart,
   AdminActivityChart,
 } from "@/components/admin/Charts";
-import { relativeTime } from "@/lib/utils";
+import { relativeTime, cn } from "@/lib/utils";
 import { PageLoader } from "@/components/LoadingSpinner";
+import { gsap, ScrollTrigger } from "@/lib/gsap";
+
+const TILE_CHROME =
+  "bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border shadow-card hover:shadow-card-hover transition-shadow duration-200 p-5 md:p-6";
+
+const ADMIN_STALE_TIME = 30 * 1000;
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [logs, setLogs] = useState<AdminLog[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ["admin", "stats"],
+    queryFn: getAdminStats,
+    staleTime: ADMIN_STALE_TIME,
+  });
+  const { data: posts = [], isLoading: postsLoading } = useQuery({
+    queryKey: ["admin", "posts"],
+    queryFn: () => getAllPostsAdmin(),
+    staleTime: ADMIN_STALE_TIME,
+  });
+  const { data: logs = [], isLoading: logsLoading } = useQuery({
+    queryKey: ["admin", "logs"],
+    queryFn: () => getAdminLogs(20),
+    staleTime: ADMIN_STALE_TIME,
+  });
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ["admin", "categories"],
+    queryFn: getAllCategoriesAdmin,
+    staleTime: ADMIN_STALE_TIME,
+  });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [s, p, l, cats] = await Promise.all([
-          getAdminStats(),
-          getAllPostsAdmin(),
-          getAdminLogs(20),
-          getAllCategoriesAdmin(),
-        ]);
-        setStats(s);
-        setPosts(p);
-        setLogs(l);
-        setCategories(cats);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const loading = statsLoading || postsLoading || logsLoading || categoriesLoading;
+
+  const statsGridRef      = useRef<HTMLDivElement>(null);
+  const trendingGridRef   = useRef<HTMLDivElement>(null);
+  const categoriesGridRef = useRef<HTMLDivElement>(null);
+
+  /* ── Scroll-reveal for dashboard sections ────────────────── */
+  useLayoutEffect(() => {
+    if (!stats) return;
+
+    const ctx = gsap.context(() => {
+      const reveal = (container: HTMLElement | null) => {
+        if (!container) return;
+        const tiles = gsap.utils.toArray<HTMLElement>("[data-admin-tile]", container);
+        if (tiles.length === 0) return;
+        gsap.set(tiles, { opacity: 0, y: 16 });
+        ScrollTrigger.batch(tiles, {
+          start: "top 92%",
+          once: true,
+          onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, duration: 0.4, stagger: 0.06, overwrite: true }),
+        });
+      };
+
+      reveal(statsGridRef.current);
+      reveal(trendingGridRef.current);
+      reveal(categoriesGridRef.current);
+    });
+
+    const id = requestAnimationFrame(() => ScrollTrigger.refresh());
+
+    return () => {
+      cancelAnimationFrame(id);
+      ctx.revert();
+    };
+  }, [stats, posts.length, logs.length, categories.length]);
 
   if (loading) return <PageLoader />;
   if (!stats) return null;
@@ -89,102 +128,96 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard
-            label="Approved Posts"
-            value={stats.totalApproved}
-            icon={CheckCircle}
-            color="green"
-          />
-          <StatsCard
-            label="Pending Review"
-            value={stats.totalPending}
-            icon={Clock}
-            color="orange"
-          />
-          <StatsCard
-            label="Rejected Posts"
-            value={stats.totalRejected}
-            icon={XCircle}
-            color="red"
-          />
-          <StatsCard
-            label="Total Users"
-            value={
-              stats.totalFeedsUsers +
-              stats.totalAdmins +
-              stats.totalStudents +
-              stats.totalGuardians
-            }
-            icon={Users}
-            color="purple"
-          />
-        </div>
+        {/* Stats + charts bento */}
+        <div ref={statsGridRef} className="grid gap-4 md:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 mb-8">
+          <div data-admin-tile className={cn("col-span-1 lg:col-span-2", TILE_CHROME)}>
+            <StatsCard label="Approved Posts" value={stats.totalApproved} icon={CheckCircle} color="green" bare />
+          </div>
+          <div data-admin-tile className={cn("col-span-1 lg:col-span-2", TILE_CHROME)}>
+            <StatsCard label="Pending Review" value={stats.totalPending} icon={Clock} color="orange" bare />
+          </div>
+          <div data-admin-tile className={cn("col-span-1 lg:col-span-2", TILE_CHROME)}>
+            <StatsCard label="Rejected Posts" value={stats.totalRejected} icon={XCircle} color="red" bare />
+          </div>
 
-        {/* Secondary stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <StatsCard
-            label="Total Engagement"
-            value={stats.totalEngagement}
-            icon={TrendingUp}
-            color="blue"
-          />
-          <StatsCard
-            label="Approval Rate"
-            value={Math.round(stats.approvalRate * 100)}
-            icon={BarChart3}
-            color="green"
-            trend={{
-              value:
-                Math.round(stats.approvalRate * 100) > 70 ? 5 : -5,
-              isPositive: Math.round(stats.approvalRate * 100) > 70,
-            }}
-          />
-          <StatsCard
-            label="New Users (7d)"
-            value={stats.newRegistrations7Days}
-            icon={Users}
-            color="blue"
-          />
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-dark-card rounded-2xl shadow-card p-6 border border-gray-100 dark:border-dark-border"
+          {/* Hero tile: total users */}
+          <div
+            data-admin-tile
+            className={cn("col-span-1 sm:col-span-2 lg:col-span-3 lg:row-span-2 flex flex-col justify-between", TILE_CHROME)}
           >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-dark-tertiary uppercase tracking-wide mb-1">
+                  Total Users
+                </p>
+                <p className="text-4xl font-bold text-gray-900 dark:text-dark-primary">
+                  {(
+                    stats.totalFeedsUsers +
+                    stats.totalAdmins +
+                    stats.totalStudents +
+                    stats.totalGuardians
+                  ).toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400">
+                <Users size={22} />
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap mt-4">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400">
+                {stats.totalFeedsUsers} readers
+              </span>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-admin-50 dark:bg-admin-900/20 text-admin-600">
+                {stats.totalAdmins} admins
+              </span>
+            </div>
+          </div>
+
+          <div data-admin-tile className={cn("col-span-1 lg:col-span-3", TILE_CHROME)}>
+            <StatsCard label="Total Engagement" value={stats.totalEngagement} icon={TrendingUp} color="blue" bare />
+          </div>
+          <div data-admin-tile className={cn("col-span-1 sm:col-span-2 lg:col-span-1", TILE_CHROME)}>
+            <StatsCard
+              label="Approval Rate"
+              value={Math.round(stats.approvalRate * 100)}
+              icon={BarChart3}
+              color="green"
+              trend={{
+                value: Math.round(stats.approvalRate * 100) > 70 ? 5 : -5,
+                isPositive: Math.round(stats.approvalRate * 100) > 70,
+              }}
+              bare
+            />
+          </div>
+          <div data-admin-tile className={cn("col-span-1 lg:col-span-2", TILE_CHROME)}>
+            <StatsCard label="New Users (7d)" value={stats.newRegistrations7Days} icon={Users} color="blue" bare />
+          </div>
+
+          {/* Charts */}
+          <div data-admin-tile className={cn("col-span-1 sm:col-span-2 lg:col-span-3 min-h-[380px] flex flex-col", TILE_CHROME)}>
             <h3 className="text-base font-semibold text-gray-900 dark:text-dark-primary mb-4">
               Posts per Day (30 days)
             </h3>
-            <PostsPerDayChart posts={posts} />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white dark:bg-dark-card rounded-2xl shadow-card p-6 border border-gray-100 dark:border-dark-border"
-          >
+            <div className="flex-1">
+              <PostsPerDayChart posts={posts} />
+            </div>
+          </div>
+          <div data-admin-tile className={cn("col-span-1 sm:col-span-2 lg:col-span-3 min-h-[380px] flex flex-col", TILE_CHROME)}>
             <h3 className="text-base font-semibold text-gray-900 dark:text-dark-primary mb-4">
               Engagement Trend
             </h3>
-            <EngagementTrendChart posts={posts} />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-dark-card rounded-2xl shadow-card p-6 lg:col-span-2 border border-gray-100 dark:border-dark-border"
-          >
+            <div className="flex-1">
+              <EngagementTrendChart posts={posts} />
+            </div>
+          </div>
+          <div data-admin-tile className={cn("col-span-1 sm:col-span-2 lg:col-span-6 min-h-[380px] flex flex-col", TILE_CHROME)}>
             <h3 className="text-base font-semibold text-gray-900 dark:text-dark-primary mb-4">
               Admin Activity
             </h3>
-            <AdminActivityChart logs={logs} />
-          </motion.div>
+            <div className="flex-1">
+              <AdminActivityChart logs={logs} />
+            </div>
+          </div>
         </div>
 
         {/* Top 3 Trending Posts */}
@@ -209,15 +242,13 @@ export default function AdminDashboard() {
               No approved posts yet
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+            <div ref={trendingGridRef} className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-3 pt-2">
               {trendingPosts.map((post, i) => {
                 const m = medals[i];
                 return (
-                  <motion.div
+                  <article
                     key={post.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.06 * i }}
+                    data-admin-tile
                     className={`relative rounded-xl border p-4 flex flex-col gap-3 ${m.bg} ${m.border}`}
                   >
                     {/* Medal */}
@@ -275,7 +306,7 @@ export default function AdminDashboard() {
                         </div>
                       ))}
                     </div>
-                  </motion.div>
+                  </article>
                 );
               })}
             </div>
@@ -303,13 +334,11 @@ export default function AdminDashboard() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {categories.map((cat, i) => (
-                <motion.div
+            <div ref={categoriesGridRef} className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {categories.map((cat) => (
+                <div
                   key={cat.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.05 * i }}
+                  data-admin-tile
                   className="relative rounded-xl p-3.5 border transition-shadow hover:shadow-md cursor-default"
                   style={{
                     backgroundColor: cat.color + "12",
@@ -344,7 +373,7 @@ export default function AdminDashboard() {
                       {cat.postCount === 1 ? "post" : "posts"}
                     </span>
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </motion.div>

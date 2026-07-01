@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Sun, Moon, Laptop } from "lucide-react";
-import { useTheme } from "@/store/useTheme";
+import { Sun, Moon, Laptop, Check } from "lucide-react";
+import { useTheme, ACCENTS } from "@/store/useTheme";
 
 const themes = [
   { value: "light" as const, label: "Light", icon: Sun },
@@ -12,7 +12,7 @@ const themes = [
 
 export default function ThemeToggle() {
   const [open, setOpen] = useState(false);
-  const { theme, isDark, setTheme } = useTheme();
+  const { theme, isDark, setTheme, accent, setAccent } = useTheme();
 
   const handleThemeChange = (newTheme: "light" | "dark" | "auto") => {
     setTheme(newTheme);
@@ -43,7 +43,7 @@ export default function ThemeToggle() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute right-0 top-full mt-2 w-40 rounded-xl shadow-2xl overflow-hidden z-50"
+            className="absolute right-0 top-full mt-2 w-48 rounded-xl shadow-2xl overflow-hidden z-50"
             style={{ background: dropdownBg, border: `1px solid ${borderColor}` }}
           >
             <div className="py-1">
@@ -69,6 +69,34 @@ export default function ThemeToggle() {
                   </button>
                 );
               })}
+            </div>
+
+            <div className="px-4 pt-3 pb-3" style={{ borderTop: `1px solid ${borderColor}` }}>
+              <p
+                className="text-[11px] font-semibold uppercase tracking-wide mb-2"
+                style={{ color: textDefault }}
+              >
+                Accent color
+              </p>
+              <div className="flex items-center gap-2.5">
+                {ACCENTS.map((a) => {
+                  const active = accent === a.value;
+                  return (
+                    <button
+                      key={a.value}
+                      onClick={() => setAccent(a.value)}
+                      title={a.label}
+                      className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110"
+                      style={{
+                        background: a.swatch,
+                        boxShadow: active ? `0 0 0 2px ${dropdownBg}, 0 0 0 4px ${a.swatch}` : "none",
+                      }}
+                    >
+                      {active && <Check size={12} className="text-white" strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </>

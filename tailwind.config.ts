@@ -1,5 +1,17 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Reads a "R G B" CSS custom property (set per accent theme in globals.css)
+ * so brand-* utilities stay swappable at runtime while still supporting
+ * Tailwind's `/opacity` modifier (e.g. bg-brand-900/20).
+ */
+function withOpacity(cssVar: string) {
+  return ({ opacityValue }: { opacityValue?: string }) =>
+    opacityValue !== undefined
+      ? `rgb(var(${cssVar}) / ${opacityValue})`
+      : `rgb(var(${cssVar}))`;
+}
+
 const config: Config = {
   darkMode: "class",
   content: [
@@ -15,19 +27,21 @@ const config: Config = {
         mono: ["Courier New", "monospace"],
       },
       colors: {
+        // Tailwind's Config type predates the documented function-value color
+        // form, so this needs a cast — see https://tailwindcss.com/docs/customizing-colors#using-css-variables
         brand: {
-          50:  "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
-          950: "#172554",
-        },
+          50:  withOpacity("--color-brand-50"),
+          100: withOpacity("--color-brand-100"),
+          200: withOpacity("--color-brand-200"),
+          300: withOpacity("--color-brand-300"),
+          400: withOpacity("--color-brand-400"),
+          500: withOpacity("--color-brand-500"),
+          600: withOpacity("--color-brand-600"),
+          700: withOpacity("--color-brand-700"),
+          800: withOpacity("--color-brand-800"),
+          900: withOpacity("--color-brand-900"),
+          950: withOpacity("--color-brand-950"),
+        } as unknown as Record<string, string>,
         indigo: {
           50:  "#eef2ff",
           100: "#e0e7ff",

@@ -93,7 +93,8 @@ export function subscribeToLatestPosts(
     const seen = new Set<string>();
     const merged = [...publicPosts, ...internalPosts]
       .filter((p) => { if (seen.has(p.id)) return false; seen.add(p.id); return true; })
-      .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+      .slice(0, pageSize);
     callback(merged);
   };
 
@@ -142,45 +143,56 @@ export function subscribeToLatestPosts(
   return () => { unsubPublic(); unsubInternal(); };
 }
 
-export async function getMorePosts(
-  lastDoc: QueryDocumentSnapshot<DocumentData>,
-  pageSize = 20
+// One-time (non-realtime) paginated fetch — used for "load more" style browsing
+// where a stable startAfter cursor is needed (doesn't compose with onSnapshot).
+export async function getLatestPostsPage(
+  pageSize = 10,
+  cursor?: QueryDocumentSnapshot<DocumentData>
 ): Promise<{ posts: Post[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }> {
-  const q = query(
-    collection(db, "posts"),
+  const constraints = [
     where("status", "==", "approved"),
     where("visibility", "==", "public"),
     orderBy("createdAt", "desc"),
-    startAfter(lastDoc),
-    limit(pageSize)
-  );
-  const snap = await getDocs(q);
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize),
+  ];
+  const snap = await getDocs(query(collection(db, "posts"), ...constraints));
   return {
     posts: snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post)),
     lastDoc: snap.docs[snap.docs.length - 1] ?? null,
   };
 }
 
-export async function getTrendingPosts(): Promise<Post[]> {
-  // Single-field query only (no composite index needed)
-  // Fetch the 100 most recent approved posts and sort by total engagement in JS
+function engagementScore(p: Post): number {
+  return (p.views ?? 0) + (p.likes ?? 0) + (p.comments ?? 0) + (p.shares ?? 0);
+}
+
+// Approved posts created within the last `days` days, ranked by total engagement.
+// Single range filter + orderBy on the same field ("createdAt") — no composite index needed.
+async function getTrendingPostsSince(days: number, take = 3): Promise<Post[]> {
+  const cutoff = Timestamp.fromDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000));
   const snap = await getDocs(
     query(
       collection(db, "posts"),
       where("status", "==", "approved"),
+      where("createdAt", ">=", cutoff),
       orderBy("createdAt", "desc"),
-      limit(100)
+      limit(200)
     )
   );
   const posts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
   return posts
     .filter((p) => p.visibility !== "internal")
-    .sort(
-      (a, b) =>
-        ((b.views ?? 0) + (b.likes ?? 0) + (b.comments ?? 0) + (b.shares ?? 0)) -
-        ((a.views ?? 0) + (a.likes ?? 0) + (a.comments ?? 0) + (a.shares ?? 0))
-    )
-    .slice(0, 3);
+    .sort((a, b) => engagementScore(b) - engagementScore(a))
+    .slice(0, take);
+}
+
+export function getWeeklyTrendingPosts(): Promise<Post[]> {
+  return getTrendingPostsSince(7);
+}
+
+export function getMonthlyTrendingPosts(): Promise<Post[]> {
+  return getTrendingPostsSince(30);
 }
 
 export async function getTopAuthors(): Promise<
@@ -329,7 +341,7 @@ export async function createPost(data: {
 }
 
 async function notifySuperAdminsOfNewPost(postId: string, authorName: string) {
-  const snap = await getDocs(collection(db, "super_admins"));
+  const snap = await getDocs(query(collection(db, "super_admins"), limit(50)));
   const batch = writeBatch(db);
   snap.docs.forEach((adminDoc) => {
     const notifRef = doc(collection(db, "notifications"));
@@ -585,7 +597,7 @@ async function notifySuperAdminsOfReport(
   reason: string,
   postTitle: string | null
 ) {
-  const snap = await getDocs(collection(db, "super_admins"));
+  const snap = await getDocs(query(collection(db, "super_admins"), limit(50)));
   const batch = writeBatch(db);
   snap.docs.forEach((adminDoc) => {
     const notifRef = doc(collection(db, "notifications"));
@@ -935,7 +947,7 @@ export async function editPost(
 
 export async function getAllFeedsUsers(): Promise<FeedsUser[]> {
   const snap = await getDocs(
-    query(collection(db, "feeds_user_only"), orderBy("createdAt", "desc"))
+    query(collection(db, "feeds_user_only"), orderBy("createdAt", "desc"), limit(1000))
   );
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FeedsUser));
 }
@@ -952,6 +964,9 @@ export interface UnifiedUser {
   totalPosts: number;
 }
 
+// O(all posts + all users) — scans the entire posts collection to compute
+// per-author counts. Expensive; call sparingly and prefer caching the result
+// (e.g. React Query) at call sites rather than re-fetching on every visit.
 export async function getAllUsersWithStats(): Promise<UnifiedUser[]> {
   const roleSources: Array<{ col: string; role: UserRole }> = [
     { col: "super_admins",   role: "superAdmin" },

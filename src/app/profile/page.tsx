@@ -18,6 +18,8 @@ import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 import toast from "react-hot-toast";
 import { storeDriveToken } from "@/lib/driveAuth";
+import { BentoGrid, BentoTile } from "@/components/BentoGrid";
+import { colorMap } from "@/components/admin/StatsCard";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -96,47 +98,51 @@ export default function ProfilePage() {
           <ArrowLeft size={16} /> Back to feed
         </Link>
 
-        {/* Profile header card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-dark-card rounded-2xl shadow-card border border-gray-100 dark:border-dark-border p-5 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-5 sm:gap-6"
-        >
-          <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 ring-4 ring-brand-100 dark:ring-brand-900/30">
-            {photoURL ? (
-              <img src={photoURL} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-brand-50">
-                <User size={36} className="text-brand-400" />
-              </div>
-            )}
-          </div>
+        {/* Profile header bento */}
+        <BentoGrid cols="grid-cols-2 sm:grid-cols-4 lg:grid-cols-6" className="mb-6">
+          <BentoTile
+            colSpan="col-span-2 sm:col-span-4 lg:col-span-3"
+            rowSpan="lg:row-span-2"
+            className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 p-5 sm:p-8"
+          >
+            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 ring-4 ring-brand-100 dark:ring-brand-900/30">
+              {photoURL ? (
+                <img src={photoURL} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-brand-50">
+                  <User size={36} className="text-brand-400" />
+                </div>
+              )}
+            </div>
 
-          <div className="flex-1 text-center sm:text-left">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-primary">{displayName}</h1>
-            <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-0.5">{email}</p>
-            <span className="mt-2 inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 capitalize">
-              {userRole}
-            </span>
-          </div>
+            <div className="flex-1 text-center sm:text-left">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-primary">{displayName}</h1>
+              <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-0.5">{email}</p>
+              <span className="mt-2 inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 capitalize">
+                {userRole}
+              </span>
+            </div>
+          </BentoTile>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 text-center w-full sm:w-auto sm:flex-shrink-0">
-            {[
-              { icon: FileText,      label: "Posts",    value: posts.length   },
-              { icon: Heart,         label: "Likes",    value: totalLikes     },
-              { icon: MessageCircle, label: "Comments", value: totalComments  },
-              { icon: Eye,           label: "Views",    value: totalViews     },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="bg-gray-50 dark:bg-dark-bg/60 sm:bg-transparent rounded-xl sm:rounded-none p-3 sm:p-0">
-                <p className="text-xl font-bold text-gray-900 dark:text-dark-primary">{value.toLocaleString()}</p>
-                <p className="text-xs text-gray-400 dark:text-dark-tertiary flex items-center gap-1 justify-center mt-0.5">
-                  <Icon size={11} /> {label}
-                </p>
+          {[
+            { icon: FileText,      label: "Posts",    value: posts.length,   color: "blue" as const },
+            { icon: Heart,         label: "Likes",    value: totalLikes,     color: "red" as const },
+            { icon: MessageCircle, label: "Comments", value: totalComments,  color: "purple" as const },
+            { icon: Eye,           label: "Views",    value: totalViews,     color: "green" as const },
+          ].map(({ icon: Icon, label, value, color }) => (
+            <BentoTile
+              key={label}
+              colSpan="col-span-1 sm:col-span-2 lg:col-span-1"
+              className="flex flex-col items-center justify-center text-center gap-2 p-4"
+            >
+              <div className={`p-3 rounded-xl ${colorMap[color]}`}>
+                <Icon size={18} />
               </div>
-            ))}
-          </div>
-        </motion.div>
+              <p className="text-xl font-bold text-gray-900 dark:text-dark-primary">{value.toLocaleString()}</p>
+              <p className="text-xs text-gray-400 dark:text-dark-tertiary">{label}</p>
+            </BentoTile>
+          ))}
+        </BentoGrid>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 dark:bg-dark-card rounded-xl p-1 mb-6 w-fit">

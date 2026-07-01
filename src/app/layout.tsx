@@ -28,9 +28,12 @@ function ThemeInitializer() {
         __html: `
           try {
             const raw = localStorage.getItem('theme-storage');
-            const theme = raw ? (JSON.parse(raw)?.state?.theme ?? 'auto') : 'auto';
+            const state = raw ? JSON.parse(raw)?.state : null;
+            const theme = state?.theme ?? 'auto';
+            const accent = state?.accent ?? 'blue';
             const isDark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
             if (isDark) document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-accent', accent);
           } catch (e) {}
         `,
       }}

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface StatsCardProps {
   label: string;
@@ -9,9 +10,11 @@ interface StatsCardProps {
   icon: LucideIcon;
   trend?: { value: number; isPositive: boolean };
   color?: "blue" | "green" | "orange" | "red" | "purple";
+  /** Skip the card chrome when nested inside a BentoTile that already provides it */
+  bare?: boolean;
 }
 
-const colorMap = {
+export const colorMap = {
   blue: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
   green: "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400",
   orange: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400",
@@ -25,12 +28,16 @@ export default function StatsCard({
   icon: Icon,
   trend,
   color = "blue",
+  bare = false,
 }: StatsCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-dark-card rounded-2xl p-5 border border-gray-100 dark:border-dark-border shadow-card hover:shadow-card-hover transition-shadow"
+      initial={bare ? undefined : { opacity: 0, y: 20 }}
+      animate={bare ? undefined : { opacity: 1, y: 0 }}
+      className={cn(
+        !bare &&
+          "bg-white dark:bg-dark-card rounded-2xl p-5 border border-gray-100 dark:border-dark-border shadow-card hover:shadow-card-hover transition-shadow"
+      )}
     >
       <div className="flex items-start justify-between">
         <div>
