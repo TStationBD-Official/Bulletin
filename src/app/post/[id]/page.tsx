@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Heart, MessageCircle, Share2, ArrowLeft, Flag, User,
-  Bookmark, Lock, Eye, Clock, Calendar,
+  Bookmark, Lock, Eye, Clock, Calendar, Globe,
 } from "lucide-react";
 import {
   getPost, resolveAuthor, isPostLiked, trackView,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/firestore";
 import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile } from "@/types";
-import { relativeTime, formatDate, readingTime, extractPlainText } from "@/lib/utils";
+import { relativeTime, formatDate, readingTime, extractPlainText, quillImageAlignTagAttributes } from "@/lib/utils";
 import CommentSection from "@/components/CommentSection";
 import { PostImages } from "@/components/ImageGallery";
 import FileAttachmentList from "@/components/FileAttachmentList";
@@ -85,12 +85,13 @@ export default function PostPage() {
 
         if (p.richContent) {
           try {
-            const converter = new QuillDeltaToHtmlConverter(
-              JSON.parse(p.richContent), {}
-            );
-            setHtmlContent(converter.render());
+            const parsed = JSON.parse(p.richContent);
+            const converter = new QuillDeltaToHtmlConverter(parsed.ops ?? [], {
+              customTagAttributes: quillImageAlignTagAttributes,
+            });
+            setHtmlContent(converter.convert());
           } catch {
-            setHtmlContent(p.richContent);
+            setHtmlContent(`<p>${p.content}</p>`);
           }
         } else {
           setHtmlContent(`<p>${p.content}</p>`);
@@ -258,10 +259,16 @@ export default function PostPage() {
                     {post.categoryIcon ?? "📌"} {post.categoryName}
                   </span>
                 )}
-                {post.visibility === "internal" && (
+                {post.visibility === "internal" ? (
                   <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
                     <Lock size={11} /> Internal
                   </span>
+                ) : (
+                  (userRole === "admin" || userRole === "student" || userRole === "guardian" || userRole === "superAdmin") && (
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800">
+                      <Globe size={11} /> Public
+                    </span>
+                  )
                 )}
               </div>
 
@@ -328,10 +335,11 @@ export default function PostPage() {
                 dangerouslySetInnerHTML={{ __html: htmlContent }}
               />
 
-              {/* Additional images */}
-              {post.imageUrls?.length > 0 && (
+              {/* Additional images — only for legacy posts without richContent;
+                  when richContent exists, its images are already inline in the article body above */}
+              {!post.richContent && post.imageUrls?.length > 1 && (
                 <div className="mt-8">
-                  <PostImages images={post.richContent ? post.imageUrls : post.imageUrls.slice(1)} />
+                  <PostImages images={post.imageUrls.slice(1)} />
                 </div>
               )}
 

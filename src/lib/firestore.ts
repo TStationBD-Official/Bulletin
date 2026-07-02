@@ -228,7 +228,9 @@ export async function getTopAuthors(): Promise<
 
   const authors = await Promise.all(
     sorted.map(async ([id, stats]) => {
-      const profile = await resolveAuthor(id);
+      // One author's lookup failing (e.g. a permission edge case) shouldn't
+      // blank out the whole widget — fall back to the post's own authorName.
+      const profile = await resolveAuthor(id).catch(() => null);
       return {
         ...(profile ?? { id, name: stats.name, email: "", profileImageUrl: null, role: "feeds_user" as UserRole }),
         totalEngagement: stats.engagement,
@@ -257,13 +259,13 @@ export async function getAuthorPosts(authorId: string): Promise<Post[]> {
 }
 
 export async function getMyPosts(authorId: string): Promise<Post[]> {
-  const q = query(
-    collection(db, "posts"),
-    where("authorId", "==", authorId),
-    orderBy("createdAt", "desc")
-  );
+  // Single-field query (authorId only) + client-side sort, avoids needing a
+  // dedicated authorId+createdAt composite index (see checkRateLimit for the
+  // same pattern — that index isn't deployed, only authorId+status+createdAt is).
+  const q = query(collection(db, "posts"), where("authorId", "==", authorId), limit(200));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
+  const posts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
+  return posts.sort((a: any, b: any) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
 }
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
@@ -279,13 +281,13 @@ export async function checkRateLimit(
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const q = query(
-    collection(db, "posts"),
-    where("authorId", "==", userId),
-    where("createdAt", ">=", Timestamp.fromDate(startOfDay))
-  );
+  // Single-field query (authorId only) + client-side date filter, avoids needing
+  // a dedicated authorId+createdAt composite index just for rate limiting.
+  const q = query(collection(db, "posts"), where("authorId", "==", userId), limit(200));
   const snap = await getDocs(q);
-  const count = snap.docs.length;
+  const count = snap.docs.filter(
+    (d) => d.data().createdAt?.toDate?.() >= startOfDay
+  ).length;
   return { allowed: count < maxPerDay, remaining: maxPerDay - count };
 }
 
@@ -340,6 +342,49 @@ export async function createPost(data: {
   }
 
   return ref.id;
+}
+
+// Editing is allowed while a post is "pending" or "rejected" — firestore.rules
+// restricts self-updates to those statuses, so this never touches authorId.
+// A re-edit always goes back through the same approval decision as a new post
+// (autoApproved -> "approved", otherwise back to "pending" for re-review).
+export async function updatePost(postId: string, data: {
+  authorName: string;
+  title?: string;
+  content: string;
+  richContent: string | null;
+  imageUrls: string[];
+  fileAttachments?: FileAttachment[];
+  visibility: "public" | "internal";
+  status: "pending" | "approved";
+  adminId?: string;
+  adminGroupId?: string;
+  categoryId?: string;
+  categoryName?: string;
+  categoryColor?: string;
+  categoryIcon?: string;
+}): Promise<void> {
+  const categoryId = data.categoryId || "general";
+  const categoryName = data.categoryName || "General";
+  const categoryColor = data.categoryColor || "#6366f1";
+  const categoryIcon = data.categoryIcon || "📌";
+
+  const cleanData = Object.fromEntries(
+    Object.entries(data).filter(([k, v]) => v !== undefined && k !== "authorName")
+  );
+
+  await updateDoc(doc(db, "posts", postId), {
+    ...cleanData,
+    categoryId,
+    categoryName,
+    categoryColor,
+    categoryIcon,
+    rejectionReason: null,
+  });
+
+  if (data.status === "pending") {
+    await notifySuperAdminsOfNewPost(postId, data.authorName);
+  }
 }
 
 async function notifySuperAdminsOfNewPost(postId: string, authorName: string) {

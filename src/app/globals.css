@@ -269,6 +269,21 @@ html {
   display: block;
   box-shadow: 0 2px 20px rgba(0,0,0,0.10);
 }
+/* Per-image alignment set from the editor's resize/align toolbar (data-align
+   attribute — see components/RichTextEditor.tsx). Default (no attribute) stays
+   centered for backward compatibility with older posts. */
+.article-body img[data-align="left"] {
+  margin-left: 0;
+  margin-right: auto;
+}
+.article-body img[data-align="right"] {
+  margin-left: auto;
+  margin-right: 0;
+}
+.article-body img[data-align="center"] {
+  margin-left: auto;
+  margin-right: auto;
+}
 .article-body hr {
   border: none;
   border-top: 1px solid #e5e7eb;

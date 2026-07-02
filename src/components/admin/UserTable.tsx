@@ -10,10 +10,10 @@ interface UserTableProps {
 
 export default function UserTable({ users }: UserTableProps) {
   const statusColors: Record<string, string> = {
-    active: "bg-green-50 text-green-700",
-    suspended: "bg-yellow-50 text-yellow-700",
-    banned: "bg-red-50 text-red-700",
-    deleted: "bg-gray-50 text-gray-700",
+    active: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400",
+    suspended: "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400",
+    banned: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400",
+    deleted: "bg-gray-50 dark:bg-dark-border text-gray-700 dark:text-dark-secondary",
   };
 
   if (users.length === 0) {

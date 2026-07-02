@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  ArrowLeft, User, FileText, Heart, MessageCircle, Eye, Bookmark,
+  ArrowLeft, User, FileText, Heart, MessageCircle, Eye, Share2,
   HardDrive, RefreshCw, CheckCircle2, AlertCircle, LogOut,
 } from "lucide-react";
 import { getMyPosts, resolveAuthor, getSavedPostIds } from "@/lib/firestore";
@@ -19,7 +19,6 @@ import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 import toast from "react-hot-toast";
 import { storeDriveToken } from "@/lib/driveAuth";
-import { BentoGrid, BentoTile } from "@/components/BentoGrid";
 import { colorMap } from "@/components/admin/StatsCard";
 
 export default function ProfilePage() {
@@ -64,6 +63,11 @@ export default function ProfilePage() {
   const totalLikes    = posts.reduce((a, p) => a + p.likes, 0);
   const totalComments = posts.reduce((a, p) => a + p.comments, 0);
   const totalViews    = posts.reduce((a, p) => a + p.views, 0);
+  const totalShares   = posts.reduce((a, p) => a + (p.shares ?? 0), 0);
+
+  const PAGE_SIZE = 5;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visiblePosts = posts.slice(0, visibleCount);
 
   const handleReconnectDrive = async () => {
     setReconnecting(true);
@@ -106,63 +110,55 @@ export default function ProfilePage() {
           <ArrowLeft size={16} /> Back to feed
         </Link>
 
-        {/* Profile header bento */}
-        <BentoGrid cols="grid-cols-2 sm:grid-cols-4 lg:grid-cols-6" className="mb-6">
-          <BentoTile
-            colSpan="col-span-2 sm:col-span-4 lg:col-span-3"
-            rowSpan="lg:row-span-2"
-            className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 p-5 sm:p-8"
-          >
-            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 ring-4 ring-brand-100 dark:ring-brand-900/30">
+        {/* Profile hero */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="relative rounded-3xl overflow-hidden border border-gray-100 dark:border-dark-border bg-white dark:bg-dark-card shadow-sm mb-6"
+        >
+          {/* Identity */}
+          <div className="px-5 sm:px-8 pt-6 pb-6 flex flex-col items-center text-center">
+            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0 ring-4 ring-brand-100 dark:ring-brand-900/30">
               {photoURL ? (
                 <img src={photoURL} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-brand-50">
+                <div className="w-full h-full flex items-center justify-center bg-brand-50 dark:bg-brand-900/30">
                   <User size={36} className="text-brand-400" />
                 </div>
               )}
             </div>
 
-            <div className="flex-1 text-center sm:text-left">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-primary">{displayName}</h1>
-              <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-0.5">{email}</p>
-              <span className="mt-2 inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 capitalize">
-                {userRole}
-              </span>
-            </div>
-          </BentoTile>
+            <h1 className="mt-4 text-2xl font-bold text-gray-900 dark:text-dark-primary">{displayName}</h1>
+            <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-0.5">{email}</p>
+            <span className="mt-2 inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 capitalize">
+              {userRole}
+            </span>
 
-          {[
-            { icon: FileText,      label: "Posts",    value: posts.length,   color: "blue" as const },
-            { icon: Heart,         label: "Likes",    value: totalLikes,     color: "red" as const },
-            { icon: MessageCircle, label: "Comments", value: totalComments,  color: "purple" as const },
-            { icon: Eye,           label: "Views",    value: totalViews,     color: "green" as const },
-          ].map(({ icon: Icon, label, value, color }) => (
-            <BentoTile
-              key={label}
-              colSpan="col-span-1 sm:col-span-2 lg:col-span-1"
-              className="flex flex-col items-center justify-center text-center gap-2 p-4"
-            >
-              <div className={`p-3 rounded-xl ${colorMap[color]}`}>
-                <Icon size={18} />
-              </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-dark-primary">{value.toLocaleString()}</p>
-              <p className="text-xs text-gray-400 dark:text-dark-tertiary">{label}</p>
-            </BentoTile>
-          ))}
-
-          <BentoTile
-            colSpan="col-span-2 sm:col-span-2 lg:col-span-1"
-            className="flex flex-col items-center justify-center text-center gap-2 p-4 cursor-pointer hover:border-brand-200 dark:hover:border-brand-800 transition-colors"
-            onClick={() => router.push("/saved")}
-          >
-            <div className={`p-3 rounded-xl ${colorMap.orange}`}>
-              <Bookmark size={18} />
+            {/* Stats row */}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-10">
+              {[
+                { icon: FileText,      label: "Posts",    value: posts.length,  color: "blue" as const },
+                { icon: Heart,         label: "Likes",    value: totalLikes,    color: "red" as const },
+                { icon: MessageCircle, label: "Comments", value: totalComments, color: "purple" as const },
+                { icon: Eye,           label: "Views",    value: totalViews,    color: "green" as const },
+                { icon: Share2,        label: "Shares",   value: totalShares,   color: "orange" as const },
+              ].map(({ icon: Icon, label, value, color }) => (
+                <div key={label} className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-lg ${colorMap[color]}`}>
+                    <Icon size={15} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-base font-bold text-gray-900 dark:text-dark-primary leading-tight">
+                      {value.toLocaleString()}
+                    </p>
+                    <p className="text-[11px] text-gray-400 dark:text-dark-tertiary leading-tight">{label}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <p className="text-xl font-bold text-gray-900 dark:text-dark-primary">Saved</p>
-            <p className="text-xs text-gray-400 dark:text-dark-tertiary">View your bookmarks</p>
-          </BentoTile>
-        </BentoGrid>
+          </div>
+        </motion.div>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 dark:bg-dark-card rounded-xl p-1 mb-6 w-fit">
@@ -202,20 +198,20 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="space-y-4">
-                  {posts.map((post, i) => (
-                    <div key={post.id} className="relative">
-                      {post.status !== "approved" && (
-                        <div className={`absolute top-3 right-3 z-10 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                          post.status === "pending"  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                          post.status === "rejected" ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
-                          "bg-gray-100 text-gray-500 dark:bg-dark-border dark:text-dark-tertiary"
-                        }`}>
-                          {post.status === "pending" ? "⏳ Pending review" : post.status === "rejected" ? "❌ Rejected" : post.status}
-                        </div>
-                      )}
-                      <PostCard post={post} author={authorProfile} index={i} isSaved={savedIdSet.has(post.id)} />
-                    </div>
+                  {visiblePosts.map((post, i) => (
+                    <PostCard key={post.id} post={post} author={authorProfile} index={i} isSaved={savedIdSet.has(post.id)} showStatus />
                   ))}
+
+                  {visibleCount < posts.length && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                        className="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border text-sm font-semibold text-gray-600 dark:text-dark-secondary hover:bg-gray-50 dark:hover:bg-dark-card-2 transition-colors"
+                      >
+                        Load {Math.min(PAGE_SIZE, posts.length - visibleCount)} more
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>

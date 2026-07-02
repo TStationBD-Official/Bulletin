@@ -133,8 +133,8 @@ export default function UserDetailPage() {
                   className="w-full h-full object-cover" referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-purple-100">
-                  <User size={32} className="text-purple-600" />
+                <div className="w-full h-full flex items-center justify-center bg-purple-100 dark:bg-purple-900/20">
+                  <User size={32} className="text-purple-600 dark:text-purple-400" />
                 </div>
               )}
             </div>
@@ -145,10 +145,10 @@ export default function UserDetailPage() {
                 <span
                   className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase ${
                     status === "active"
-                      ? "bg-green-50 text-green-700"
+                      ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
                       : status === "suspended"
-                      ? "bg-yellow-50 text-yellow-700"
-                      : "bg-red-50 text-red-700"
+                      ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400"
+                      : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
                   }`}
                 >
                   {status}
@@ -187,13 +187,13 @@ export default function UserDetailPage() {
               )}
               <button
                 onClick={() => setConfirmAction("soft_delete")}
-                className="px-4 py-2 text-xs border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors"
+                className="px-4 py-2 text-xs border border-orange-200 dark:border-orange-800/60 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
               >
                 Soft Delete
               </button>
               <button
                 onClick={() => setConfirmAction("hard_delete")}
-                className="px-4 py-2 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                className="px-4 py-2 text-xs border border-red-200 dark:border-red-800/60 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
                 Hard Delete
               </button>

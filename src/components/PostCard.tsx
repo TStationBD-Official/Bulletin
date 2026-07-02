@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Heart, MessageCircle, Eye, Bookmark, Share2, Flag, User, Lock } from "lucide-react";
+import { Heart, MessageCircle, Eye, Bookmark, Share2, Flag, User, Lock, Pencil, Globe } from "lucide-react";
 import { Post, AuthorProfile, Comment } from "@/types";
 import { relativeTime, readingTime, extractFirstImage, extractPlainText } from "@/lib/utils";
 import { likePost, unlikePost, savePost, unsavePost, sharePost, getRecentComments } from "@/lib/firestore";
@@ -25,6 +25,8 @@ interface PostCardProps {
   onSaveChange?: (saved: boolean) => void;
   /** Skip the framer-motion mount animation when a scroll-triggered reveal (e.g. GSAP) drives this card instead */
   disableMountAnimation?: boolean;
+  /** Show the pending/rejected status pill in the header (e.g. on the profile "My Posts" list) */
+  showStatus?: boolean;
 }
 
 export default function PostCard({
@@ -36,6 +38,7 @@ export default function PostCard({
   onLikeChange,
   onSaveChange,
   disableMountAnimation = false,
+  showStatus = false,
 }: PostCardProps) {
   const router = useRouter();
   const { user, userRole, settings } = useStore();
@@ -59,6 +62,9 @@ export default function PostCard({
     extractPlainText(post.richContent ?? null, post.richContent ?? post.content ?? "")
   );
   const preview  = (post.content || "").replace(/<[^>]*>/g, "").slice(0, 180).trim();
+  const isOwner  = user?.uid === post.authorId;
+  const canEdit  = isOwner && (post.status === "pending" || post.status === "rejected");
+  const showPill = showStatus && post.status !== "approved";
   const thumb    = extractFirstImage(post.imageUrls, post.richContent);
   const catColor = post.categoryColor ?? "#6366f1";
 
@@ -138,7 +144,7 @@ export default function PostCard({
         onClick={() => router.push(`/post/${post.id}`)}
         className="group flex flex-col p-5 md:p-6 mb-3 bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border cursor-pointer hover:border-gray-200 dark:hover:border-dark-border/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
       >
-        {/* ── Header row: avatar + name/meta, bookmark+report top-right ── */}
+        {/* ── Header row: avatar + name/meta, edit top-right for own pending posts ── */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0 ring-1 ring-gray-100 dark:ring-dark-border">
@@ -162,39 +168,49 @@ export default function PostCard({
                 <span>{relativeTime(post.createdAt)}</span>
                 <span className="text-gray-200 dark:text-dark-muted">·</span>
                 <span>{readMin} min read</span>
-                {post.visibility === "internal" && (
+                {post.visibility === "internal" ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60">
                     <Lock size={8} /> Internal
                   </span>
+                ) : (
+                  // Only worth showing on feeds that can actually mix public + internal posts
+                  // (admin/student/guardian/superAdmin) — a plain feeds_user never sees internal
+                  // posts at all, so tagging every card "Public" there would just be noise.
+                  (userRole === "admin" || userRole === "student" || userRole === "guardian" || userRole === "superAdmin") && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200/60 dark:border-green-800/60">
+                      <Globe size={8} /> Public
+                    </span>
+                  )
                 )}
               </div>
             </div>
           </div>
 
-          {/* Bookmark + report */}
-          <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            <motion.button
-              whileTap={{ scale: 1.2 }}
-              transition={{ type: "spring", stiffness: 300, damping: 15 }}
-              onClick={handleSave}
-              title="Save"
-              className={`p-1.5 rounded-lg transition-colors ${
-                saved ? "bg-brand-500 text-white shadow-sm" : "text-gray-300 dark:text-dark-muted hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20"
-              }`}
-            >
-              <Bookmark size={16} fill={saved ? "currentColor" : "none"} />
-            </motion.button>
-
-            {user && (
-              <button
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowReport(true); }}
-                title="Report"
-                className="p-1.5 rounded-lg text-gray-200 dark:text-dark-muted hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                <Flag size={14} />
-              </button>
-            )}
-          </div>
+          {(showPill || canEdit) && (
+            <div className="flex-shrink-0 flex flex-col items-end gap-1">
+              {showPill && (
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                  post.status === "pending"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : post.status === "rejected"
+                    ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                    : "bg-gray-100 text-gray-500 dark:bg-dark-border dark:text-dark-tertiary"
+                }`}>
+                  {post.status === "pending" ? "⏳ Pending review" : post.status === "rejected" ? "❌ Rejected" : post.status}
+                </span>
+              )}
+              {canEdit && (
+                <Link
+                  href={`/compose?edit=${post.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Edit post"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-dark-card-2 text-gray-500 dark:text-dark-tertiary hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors text-[12px] font-semibold"
+                >
+                  <Pencil size={13} /> Edit
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Content ───────────────────────────────────────────── */}
@@ -240,9 +256,9 @@ export default function PostCard({
           </span>
         </div>
 
-        {/* ── Footer: like / comment / share, evenly spaced ────── */}
+        {/* ── Footer: like / comment / share / save / report, evenly spaced ── */}
         <div
-          className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-dark-border/60 mt-3.5 pt-2.5 border-t border-gray-50 dark:border-dark-border/60"
+          className="flex items-stretch divide-x divide-gray-100 dark:divide-dark-border/60 mt-3.5 pt-2.5 border-t border-gray-50 dark:border-dark-border/60"
           onClick={(e) => e.stopPropagation()}
         >
           <motion.button
@@ -250,7 +266,7 @@ export default function PostCard({
             transition={{ type: "spring", stiffness: 300, damping: 15 }}
             onClick={handleLike}
             title="Like"
-            className={`flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg transition-colors ${
               liked ? "text-red-500" : "text-gray-500 dark:text-dark-tertiary hover:text-red-400"
             }`}
           >
@@ -261,7 +277,7 @@ export default function PostCard({
           <button
             onClick={handleToggleComments}
             title="Comments"
-            className={`flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg transition-colors ${
               showComments ? "text-brand-500" : "text-gray-500 dark:text-dark-tertiary hover:text-brand-400"
             }`}
           >
@@ -273,16 +289,38 @@ export default function PostCard({
             <button
               onClick={handleShare}
               title="Share"
-              className="flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg text-gray-500 dark:text-dark-tertiary hover:text-gray-700 dark:hover:text-dark-secondary transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg text-gray-500 dark:text-dark-tertiary hover:text-gray-700 dark:hover:text-dark-secondary transition-colors"
             >
               <Share2 size={15} />
               {post.shares}
             </button>
           ) : (
-            <span className="flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium text-gray-300 dark:text-dark-muted">
+            <span className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium text-gray-300 dark:text-dark-muted">
               <Share2 size={15} />
               {post.shares}
             </span>
+          )}
+
+          <motion.button
+            whileTap={{ scale: 1.2 }}
+            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            onClick={handleSave}
+            title="Save"
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg transition-colors ${
+              saved ? "text-brand-500" : "text-gray-500 dark:text-dark-tertiary hover:text-brand-400"
+            }`}
+          >
+            <Bookmark size={15} fill={saved ? "currentColor" : "none"} />
+          </motion.button>
+
+          {user && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowReport(true); }}
+              title="Report"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-medium rounded-lg text-gray-500 dark:text-dark-tertiary hover:text-red-400 transition-colors"
+            >
+              <Flag size={15} />
+            </button>
           )}
         </div>
 

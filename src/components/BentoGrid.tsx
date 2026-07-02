@@ -69,7 +69,7 @@ export function BentoTile({
         colSpan,
         rowSpan,
         !bare &&
-          "bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border shadow-card hover:shadow-card-hover transition-shadow duration-200 p-5 md:p-6",
+          "bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border shadow-card hover:shadow-card-hover transition-shadow duration-200 p-5 md:p-6",
         className
       )}
     >

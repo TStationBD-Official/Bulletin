@@ -154,7 +154,7 @@ export default function PendingPostsPage() {
                       {relativeTime(item.post.createdAt)}
                     </p>
                   </div>
-                  <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 text-[11px] font-bold rounded-full">
+                  <span className="px-2.5 py-1 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 text-[11px] font-bold rounded-full">
                     PENDING
                   </span>
                 </div>
@@ -177,11 +177,13 @@ export default function PendingPostsPage() {
                             key={cat.id}
                             type="button"
                             onClick={() => updatePostCategory(item.post.id, cat.id)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border"
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
+                              active ? "" : "border-gray-200 dark:border-dark-border text-gray-400 dark:text-dark-tertiary"
+                            }`}
                             style={
                               active
                                 ? { borderColor: cat.color, backgroundColor: cat.color + "18", color: cat.color }
-                                : { borderColor: "#e5e7eb", color: "#9ca3af" }
+                                : undefined
                             }
                           >
                             {cat.icon} {cat.name}

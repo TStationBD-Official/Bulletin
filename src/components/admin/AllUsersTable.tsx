@@ -16,18 +16,18 @@ interface Props {
 }
 
 const ROLE_STYLES: Record<UserRole, { label: string; classes: string }> = {
-  superAdmin: { label: "Super Admin",  classes: "bg-purple-100 text-purple-700" },
-  admin:      { label: "Admin",        classes: "bg-blue-100 text-blue-700"     },
-  student:    { label: "Student",      classes: "bg-green-100 text-green-700"   },
-  guardian:   { label: "Guardian",     classes: "bg-amber-100 text-amber-700"   },
-  feeds_user: { label: "Website User", classes: "bg-gray-100 text-gray-600"     },
+  superAdmin: { label: "Super Admin",  classes: "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400" },
+  admin:      { label: "Admin",        classes: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"         },
+  student:    { label: "Student",      classes: "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400"     },
+  guardian:   { label: "Guardian",     classes: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"     },
+  feeds_user: { label: "Website User", classes: "bg-gray-100 dark:bg-dark-border text-gray-600 dark:text-dark-secondary"   },
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  active:    "bg-green-50 text-green-700",
-  suspended: "bg-yellow-50 text-yellow-700",
-  banned:    "bg-red-50 text-red-700",
-  deleted:   "bg-gray-100 text-gray-500",
+  active:    "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400",
+  suspended: "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400",
+  banned:    "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400",
+  deleted:   "bg-gray-100 dark:bg-dark-border text-gray-500 dark:text-dark-tertiary",
 };
 
 type PendingAction =
@@ -125,11 +125,11 @@ export default function AllUsersTable({ users: initialUsers }: Props) {
                   {/* Avatar + name + email */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0">
                         {u.profileImageUrl ? (
                           <img src={u.profileImageUrl} alt={u.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-brand-100">
+                          <div className="w-full h-full flex items-center justify-center bg-brand-100 dark:bg-brand-900/30">
                             <User size={14} className="text-brand-500" />
                           </div>
                         )}
@@ -184,7 +184,7 @@ export default function AllUsersTable({ users: initialUsers }: Props) {
                       <div className="relative inline-block">
                         <button
                           onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border text-gray-400 hover:text-gray-600 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border text-gray-400 dark:text-dark-tertiary hover:text-gray-600 dark:hover:text-dark-secondary transition-colors"
                         >
                           <MoreVertical size={15} />
                         </button>

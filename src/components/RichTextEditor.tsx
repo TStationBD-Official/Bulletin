@@ -39,6 +39,11 @@ if (typeof window !== "undefined") {
       const base = (super.formats as Function)(domNode) as Record<string, any>;
       const w = domNode.style.width || domNode.getAttribute("width");
       if (w) base.width = w;
+      // Custom attribute name (not Quill's built-in block-level "align") so it
+      // survives delta round-trips and can be read back out during rendering —
+      // see customCssClasses in post/[id]/page.tsx & compose/page.tsx.
+      const align = domNode.getAttribute("data-align");
+      if (align) base.imgAlign = align;
       return base;
     }
     format(name: string, value: string | false) {
@@ -49,6 +54,26 @@ if (typeof window !== "undefined") {
         } else {
           (this as any).domNode.style.removeProperty("width");
           (this as any).domNode.removeAttribute("width");
+        }
+      } else if (name === "imgAlign") {
+        const el = (this as any).domNode as HTMLElement;
+        el.style.removeProperty("display");
+        el.style.removeProperty("margin-left");
+        el.style.removeProperty("margin-right");
+        if (value) {
+          el.setAttribute("data-align", String(value));
+          if (value === "center") {
+            el.style.display = "block";
+            el.style.marginLeft = "auto";
+            el.style.marginRight = "auto";
+          } else if (value === "right") {
+            el.style.display = "block";
+            el.style.marginLeft = "auto";
+            el.style.marginRight = "0";
+          }
+          // left = default, no extra styles needed
+        } else {
+          el.removeAttribute("data-align");
         }
       } else {
         (super.format as Function)(name, value);
@@ -157,7 +182,7 @@ const formats = [
   "list", "bullet",
   "blockquote", "code-block",
   "link", "image", "video",
-  "width",
+  "width", "imgAlign",
 ];
 
 export interface RichTextEditorRef {
@@ -302,54 +327,34 @@ export default function RichTextEditor({
     });
   }, [accessToken, postId]);
 
-  // ── Resize apply — pure DOM + push updated HTML through onChange ──────────
-  const applyResize = (size: string) => {
-    if (!selectedImg) return;
-
-    // Set width directly on the DOM element
-    if (size) {
-      selectedImg.el.style.width = size;
-      selectedImg.el.style.maxWidth = "100%";
-    } else {
-      selectedImg.el.style.removeProperty("width");
-      selectedImg.el.style.removeProperty("max-width");
-    }
-
-    // Push updated innerHTML through onChange so the parent (compose page)
-    // gets the new HTML with the inline style included
+  // Route a format change through Quill's own formatText() API rather than
+  // mutating the DOM directly. quill.formatText() synchronously calls the
+  // blot's format() (applies the visual style) AND updates Quill's Delta
+  // model in the same tick — mutating el.style directly and waiting for
+  // Quill's async MutationObserver to notice was a race: editor.getContents()
+  // (called right after, to save) could run before Quill re-synced, so the
+  // change silently never made it into the saved delta.
+  const applyBlotFormat = (name: "width" | "imgAlign", value: string) => {
+    if (!selectedImg) return null;
     const quill = quillRef.current?.getEditor?.();
-    if (quill) {
-      const html = quill.root.innerHTML;
-      onChange(html, {}, "user", quill as any);
-    }
+    if (!quill) return null;
+    const blot = _Quill?.find?.(selectedImg.el);
+    if (!blot) return null;
+    const index = quill.getIndex(blot);
+    quill.formatText(index, 1, name, value || false, "user");
+    onChange(quill.root.innerHTML, {}, "user", quill as any);
+    return quill;
+  };
 
+  // ── Resize apply ──────────────────────────────────────────────────────────
+  const applyResize = (size: string) => {
+    if (!applyBlotFormat("width", size)) return;
     setSelectedImg(prev => prev ? { ...prev, width: size } : null);
   };
 
   // ── Align apply ───────────────────────────────────────────────────────────
   const applyAlign = (align: string) => {
-    if (!selectedImg) return;
-    const el = selectedImg.el;
-
-    // Reset all alignment styles first
-    el.style.removeProperty("display");
-    el.style.removeProperty("margin-left");
-    el.style.removeProperty("margin-right");
-    el.style.removeProperty("float");
-
-    if (align === "center") {
-      el.style.display = "block";
-      el.style.marginLeft = "auto";
-      el.style.marginRight = "auto";
-    } else if (align === "right") {
-      el.style.display = "block";
-      el.style.marginLeft = "auto";
-      el.style.marginRight = "0";
-    }
-    // left = default (no extra styles needed)
-
-    const quill = quillRef.current?.getEditor?.();
-    if (quill) onChange(quill.root.innerHTML, {}, "user", quill as any);
+    if (!applyBlotFormat("imgAlign", align)) return;
     setSelectedImg(prev => prev ? { ...prev, align } : null);
   };
 

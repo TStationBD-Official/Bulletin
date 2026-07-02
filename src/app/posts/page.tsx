@@ -160,7 +160,7 @@ export default function AllPostsPage() {
     const ids = Array.from(new Set(missing.map((p) => p.authorId)));
     (async () => {
       const entries: Record<string, AuthorProfile | null> = {};
-      await Promise.all(ids.map(async (id) => { entries[id] = await resolveAuthor(id); }));
+      await Promise.all(ids.map(async (id) => { entries[id] = await resolveAuthor(id).catch(() => null); }));
       setAuthorCache((prev) => ({ ...prev, ...entries }));
     })();
   }, [posts]);

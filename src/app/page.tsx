@@ -40,7 +40,10 @@ export default function FeedPage() {
 
   const { data: weeklyTrending = [] }  = useQuery({ queryKey: ["trending", "weekly"],  queryFn: getWeeklyTrendingPosts });
   const { data: monthlyTrending = [] } = useQuery({ queryKey: ["trending", "monthly"], queryFn: getMonthlyTrendingPosts });
-  const { data: topAuthors = [] }      = useQuery({ queryKey: ["topAuthors"], queryFn: getTopAuthors });
+  const { data: topAuthors = [], error: topAuthorsError } = useQuery({
+    queryKey: ["topAuthors"],
+    queryFn: getTopAuthors,
+  });
   const { data: savedPostIds = [] } = useQuery({
     queryKey: ["savedPostIds", user?.uid, userRole],
     queryFn: () => getSavedPostIds(user!.uid, userRole!),
@@ -111,6 +114,10 @@ export default function FeedPage() {
     return () => unsub();
   }, [user?.uid, userRole]);
 
+  useEffect(() => {
+    if (topAuthorsError) console.error("Failed to load top authors:", topAuthorsError);
+  }, [topAuthorsError]);
+
   /* ── Resolve authors for feed posts ─────────────────────── */
   useEffect(() => {
     const missing = posts.filter((p) => !authorCache[p.authorId]);
@@ -118,7 +125,7 @@ export default function FeedPage() {
     const ids = Array.from(new Set(missing.map((p) => p.authorId)));
     (async () => {
       const entries: Record<string, AuthorProfile | null> = {};
-      await Promise.all(ids.map(async (id) => { entries[id] = await resolveAuthor(id); }));
+      await Promise.all(ids.map(async (id) => { entries[id] = await resolveAuthor(id).catch(() => null); }));
       setAuthorCache((prev) => ({ ...prev, ...entries }));
     })();
   }, [posts]);
@@ -348,7 +355,7 @@ export default function FeedPage() {
                               {author.totalPosts} posts · {author.totalEngagement.toLocaleString()} engagements
                             </p>
                           </div>
-                          <ArrowRight size={13} className="text-gray-200 dark:text-dark-muted group-hover:text-brand-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                          <ArrowRight size={13} className="text-gray-300 dark:text-dark-muted group-hover:text-brand-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                         </Link>
                       ))}
                     </div>

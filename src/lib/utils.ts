@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Carries the RichTextEditor's custom "imgAlign" delta attribute (set via
+// data-align on the image blot, see components/RichTextEditor.tsx) through
+// to the rendered <img data-align="..."> so both the live post view and the
+// edit-page prefill (which re-parses this HTML back into Quill) see the same
+// alignment. Pair with the `.article-body img[data-align="..."]` CSS rules.
+export function quillImageAlignTagAttributes(op: any): Record<string, string> | void {
+  if (op.isImage?.() && op.attributes?.imgAlign) {
+    return { "data-align": op.attributes.imgAlign };
+  }
+}
+
 export function toDate(ts: Timestamp | Date | undefined | null): Date {
   if (!ts) return new Date();
   if (ts instanceof Timestamp) return ts.toDate();

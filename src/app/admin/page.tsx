@@ -113,7 +113,7 @@ export default function AdminDashboard() {
 
   const medals = [
     { bg: "bg-yellow-50 dark:bg-yellow-900/20", border: "border-yellow-200 dark:border-yellow-700/40", icon: "🥇" },
-    { bg: "bg-gray-50 dark:bg-gray-800/30",     border: "border-gray-200 dark:border-gray-700",        icon: "🥈" },
+    { bg: "bg-gray-50 dark:bg-dark-card-2",     border: "border-gray-200 dark:border-dark-border",     icon: "🥈" },
     { bg: "bg-orange-50 dark:bg-orange-900/20", border: "border-orange-200 dark:border-orange-700/40", icon: "🥉" },
   ];
 
@@ -167,7 +167,7 @@ export default function AdminDashboard() {
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400">
                 {stats.totalFeedsUsers} readers
               </span>
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-admin-50 dark:bg-admin-900/20 text-admin-600">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-admin-50 dark:bg-admin-900/20 text-admin-600 dark:text-admin-400">
                 {stats.totalAdmins} admins
               </span>
             </div>

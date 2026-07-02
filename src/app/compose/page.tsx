@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Globe, Lock, AlertCircle, CheckCircle2, User,
@@ -9,13 +9,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { createPost, checkRateLimit } from "@/lib/firestore";
+import { QuillDeltaToHtmlConverter } from "quill-delta-to-html";
+import { createPost, updatePost, getPost, checkRateLimit } from "@/lib/firestore";
+import { quillImageAlignTagAttributes } from "@/lib/utils";
 import { uploadImage, uploadFile } from "@/lib/drive";
 import { getCategories, seedDefaultCategories, SEED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
 import { Category, FileAttachment } from "@/types";
 import FileAttachmentList from "@/components/FileAttachmentList";
 import { useStore } from "@/store/useStore";
-import { reconnectDrive } from "@/lib/driveAuth";
+import { reconnectDrive, getValidDriveToken } from "@/lib/driveAuth";
 import EmptyState from "@/components/EmptyState";
 import { PageLoader } from "@/components/LoadingSpinner";
 import toast from "react-hot-toast";
@@ -35,7 +37,11 @@ const ALLOWED_ATTACHMENT_TYPES = [
 
 export default function ComposePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editPostId = searchParams.get("edit");
   const { user, userRole, userData, accessToken, settings, setAccessToken } = useStore();
+
+  const [editLoaded, setEditLoaded] = useState(!editPostId);
 
   const [title,           setTitle]           = useState("");
   const [htmlContent,     setHtmlContent]     = useState("");
@@ -90,8 +96,9 @@ export default function ComposePage() {
     setMaxPostsPerDay(settings?.maxPostsPerDay ?? 10);
     (async () => {
       try {
+        // Editing an existing post doesn't count against the daily new-post limit
         const [{ allowed, remaining }, cats] = await Promise.all([
-          checkRateLimit(user.uid, "post"),
+          editPostId ? Promise.resolve({ allowed: true, remaining: maxPostsPerDay }) : checkRateLimit(user.uid, "post"),
           getCategories().catch(() => []),
         ]);
         setRateLimited(!allowed);
@@ -107,6 +114,41 @@ export default function ComposePage() {
       }
     })();
   }, [user?.uid]);
+
+  // Load the existing post when editing (?edit=<postId>) and prefill the form
+  useEffect(() => {
+    if (!editPostId || !user) return;
+    (async () => {
+      try {
+        const p = await getPost(editPostId);
+        if (!p || p.authorId !== user.uid || (p.status !== "pending" && p.status !== "rejected")) {
+          toast.error("This post can no longer be edited.");
+          router.replace("/profile");
+          return;
+        }
+        setTitle(p.title ?? "");
+        setDeltaContent(p.richContent ?? "");
+        setPlainText((p.content ?? "").replace(/<[^>]*>/g, "").trim());
+        try {
+          const parsed = JSON.parse(p.richContent ?? "{}");
+          const converter = new QuillDeltaToHtmlConverter(parsed.ops ?? [], {
+            customTagAttributes: quillImageAlignTagAttributes,
+          });
+          setHtmlContent(converter.convert());
+        } catch {
+          setHtmlContent(`<p>${p.content ?? ""}</p>`);
+        }
+        setVisibility(p.visibility);
+        setSelectedCategoryId(p.categoryId ?? DEFAULT_CATEGORY.id);
+        setAttachments(p.fileAttachments ?? []);
+      } catch {
+        toast.error("Couldn't load post for editing.");
+        router.replace("/profile");
+      } finally {
+        setEditLoaded(true);
+      }
+    })();
+  }, [editPostId, user?.uid]);
 
   const handleEditorChange = (html: string, _delta: any, _source: string, editor: any) => {
     setHtmlContent(html);
@@ -132,6 +174,17 @@ export default function ComposePage() {
     }
   };
 
+  // Silently refreshes the Drive token if it's stale before any upload, so
+  // users aren't asked to manually "reconnect" just because time passed —
+  // the background 50-min refresh interval in useAuth.ts can lag or miss a
+  // beat (throttled/backgrounded tabs), so we re-check right before use too.
+  const ensureFreshAccessToken = async (): Promise<string | null> => {
+    if (!user) return null;
+    const fresh = await getValidDriveToken(user.uid);
+    if (fresh && fresh !== accessToken) setAccessToken(fresh);
+    return fresh;
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = ""; // allow re-selecting the same file later
@@ -151,12 +204,18 @@ export default function ComposePage() {
 
     setUploadingFile(true);
     try {
+      const token = (await ensureFreshAccessToken()) ?? accessToken;
+      if (!token) {
+        toast.error("Google Drive session expired. Click Reconnect and try again.");
+        return;
+      }
       for (const file of valid) {
         try {
-          const { url } = await uploadFile(file, accessToken, `tmp_${Date.now()}`);
+          const { url } = await uploadFile(file, token, `tmp_${Date.now()}`);
           setAttachments((prev) => [...prev, { url, name: file.name, mimeType: file.type, size: file.size }]);
-        } catch {
-          toast.error(`Failed to upload ${file.name}`);
+        } catch (err: any) {
+          console.error(`Failed to upload ${file.name}:`, err);
+          toast.error(err?.message ? `Failed to upload ${file.name}: ${err.message}` : `Failed to upload ${file.name}`);
         }
       }
     } finally {
@@ -166,6 +225,10 @@ export default function ComposePage() {
 
   const handleRemoveAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRenameAttachment = (index: number, name: string) => {
+    setAttachments((prev) => prev.map((a, i) => (i === index ? { ...a, name } : a)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -186,19 +249,32 @@ export default function ComposePage() {
 
     setSubmitting(true);
     try {
-      const { allowed, remaining } = await checkRateLimit(user!.uid, "post");
-      if (!allowed) {
-        toast.error(`Daily post limit of ${maxPostsPerDay} reached`);
-        setRateLimited(true);
-        setPostsRemaining(0);
-        return;
+      let remaining = postsRemaining ?? 0;
+      if (!editPostId) {
+        const rl = await checkRateLimit(user!.uid, "post");
+        remaining = rl.remaining;
+        if (!rl.allowed) {
+          toast.error(`Daily post limit of ${maxPostsPerDay} reached`);
+          setRateLimited(true);
+          setPostsRemaining(0);
+          return;
+        }
       }
 
       let cleanDelta = deltaContent;
-      try {
+      {
         const delta = JSON.parse(deltaContent);
         let changed = false;
         const ops = delta.ops ?? [];
+        const dataImageCount = ops.filter(
+          (op: any) => typeof op.insert?.image === "string" && op.insert.image.startsWith("data:")
+        ).length;
+        const imageToken = dataImageCount > 0 ? (await ensureFreshAccessToken()) ?? accessToken : accessToken;
+        if (dataImageCount > 0 && !imageToken) {
+          throw new Error("Google Drive session expired. Click Reconnect and try again.");
+        }
+
+        const uploadErrors: string[] = [];
         await Promise.all(
           ops.map(async (op: any, i: number) => {
             if (typeof op.insert?.image === "string" && op.insert.image.startsWith("data:")) {
@@ -209,15 +285,20 @@ export default function ComposePage() {
                 const arr = new Uint8Array(bytes.length);
                 for (let j = 0; j < bytes.length; j++) arr[j] = bytes.charCodeAt(j);
                 const file = new File([arr], `img_${i}.${mime.split("/")[1] ?? "png"}`, { type: mime });
-                const url = await uploadImage(file, accessToken, `tmp_${Date.now()}_${i}`);
+                const url = await uploadImage(file, imageToken, `tmp_${Date.now()}_${i}`);
                 ops[i] = { ...op, insert: { image: url } };
                 changed = true;
-              } catch {}
+              } catch {
+                uploadErrors.push(`Image ${i + 1}`);
+              }
             }
           })
         );
+        if (uploadErrors.length > 0) {
+          throw new Error(`Failed to upload: ${uploadErrors.join(", ")}. Please remove or retry them.`);
+        }
         if (changed) cleanDelta = JSON.stringify({ ...delta, ops });
-      } catch {}
+      }
 
       const imageUrls: string[] = [];
       try {
@@ -227,12 +308,38 @@ export default function ComposePage() {
         });
       } catch {}
 
+      if (editPostId) {
+        await updatePost(editPostId, {
+          authorName: userName,
+          title: title.trim() || undefined,
+          content: plainText.slice(0, 500),
+          richContent: cleanDelta,
+          imageUrls,
+          fileAttachments: attachments,
+          visibility: showVisibility ? visibility : "public",
+          status: autoApproved ? "approved" : "pending",
+          adminId: autoApproved ? user!.uid : undefined,
+          adminGroupId: showVisibility && visibility === "internal" ? adminGroupId : undefined,
+          categoryId: selectedCat?.id ?? DEFAULT_CATEGORY.id,
+          categoryName: selectedCat?.name ?? DEFAULT_CATEGORY.name,
+          categoryColor: selectedCat?.color ?? DEFAULT_CATEGORY.color,
+          categoryIcon: selectedCat?.icon ?? DEFAULT_CATEGORY.icon,
+        });
+
+        toast.success(
+          autoApproved ? "Post updated and published! 🎉" : "Post updated — submitted for review again 📋",
+          { duration: 5000 }
+        );
+        router.push(`/post/${editPostId}`);
+        return;
+      }
+
       const postId = await createPost({
         authorId: user!.uid,
         authorName: userName,
         title: title.trim() || undefined,
         content: plainText.slice(0, 500),
-        richContent: htmlContent || cleanDelta,
+        richContent: cleanDelta,
         imageUrls,
         fileAttachments: attachments,
         visibility: showVisibility ? visibility : "public",
@@ -248,8 +355,10 @@ export default function ComposePage() {
       setPostsRemaining(Math.max(0, remaining - 1));
       toast.success(autoApproved ? "Post published! 🎉" : "Submitted for review! 📋", { duration: 5000 });
       router.push(`/post/${postId}`);
-    } catch {
-      toast.error("Failed to create post. Please try again.");
+    } catch (err: any) {
+      console.error("Failed to save post:", err);
+      const verb = editPostId ? "update" : "create";
+      toast.error(err?.message ? `Failed to ${verb} post: ${err.message}` : `Failed to ${verb} post. Please try again.`);
     } finally {
       setSubmitting(false);
     }
@@ -272,7 +381,7 @@ export default function ComposePage() {
     );
   }
 
-  if (!rateLimitChecked) return <PageLoader />;
+  if (!rateLimitChecked || !editLoaded) return <PageLoader />;
 
   return (
     <main className="page min-h-screen bg-white dark:bg-dark-bg">
@@ -288,7 +397,7 @@ export default function ComposePage() {
             Back
           </Link>
 
-          <span className="text-sm text-gray-400 dark:text-dark-muted font-medium">New Post</span>
+          <span className="text-sm text-gray-400 dark:text-dark-muted font-medium">{editPostId ? "Edit Post" : "New Post"}</span>
         </div>
 
         {/* ── Drive reconnect banner (mobile + when disconnected) ── */}
@@ -476,6 +585,7 @@ export default function ComposePage() {
                           uploadingFile={uploadingFile}
                           onFileSelect={handleFileSelect}
                           onRemoveAttachment={handleRemoveAttachment}
+                          onRenameAttachment={handleRenameAttachment}
                         />
                       </div>
                     </motion.div>
@@ -504,12 +614,12 @@ export default function ComposePage() {
                           transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
                           className="w-4 h-4 border-2 border-white dark:border-dark-bg border-t-transparent rounded-full"
                         />
-                        {autoApproved ? "Publishing…" : "Submitting…"}
+                        {editPostId ? "Saving…" : autoApproved ? "Publishing…" : "Submitting…"}
                       </>
                     ) : (
                       <>
                         <Send size={14} />
-                        {autoApproved ? "Publish" : "Submit"}
+                        {editPostId ? "Save" : autoApproved ? "Publish" : "Submit"}
                       </>
                     )}
                   </motion.button>
@@ -543,6 +653,7 @@ export default function ComposePage() {
                   uploadingFile={uploadingFile}
                   onFileSelect={handleFileSelect}
                   onRemoveAttachment={handleRemoveAttachment}
+                  onRenameAttachment={handleRenameAttachment}
                 />
 
                 {/* Action buttons */}
@@ -561,12 +672,12 @@ export default function ComposePage() {
                           transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
                           className="w-4 h-4 border-2 border-white dark:border-dark-bg border-t-transparent rounded-full"
                         />
-                        {autoApproved ? "Publishing…" : "Submitting…"}
+                        {editPostId ? "Saving changes…" : autoApproved ? "Publishing…" : "Submitting…"}
                       </>
                     ) : (
                       <>
                         <Send size={14} />
-                        {autoApproved ? "Publish Post" : "Submit for Review"}
+                        {editPostId ? "Save Changes" : autoApproved ? "Publish Post" : "Submit for Review"}
                       </>
                     )}
                   </motion.button>
@@ -630,13 +741,14 @@ interface SidebarContentProps {
   uploadingFile: boolean;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveAttachment: (index: number) => void;
+  onRenameAttachment: (index: number, name: string) => void;
 }
 
 function SidebarContent({
   categories, selectedCategoryId, setSelectedCategoryId, selectedCat,
   showVisibility, visibility, setVisibility, internalDescription,
   autoApproved, photoURL, userName, accessToken, reconnecting, onReconnectDrive,
-  attachments, uploadingFile, onFileSelect, onRemoveAttachment,
+  attachments, uploadingFile, onFileSelect, onRemoveAttachment, onRenameAttachment,
 }: SidebarContentProps) {
   return (
     <div className="space-y-6">
@@ -700,7 +812,12 @@ function SidebarContent({
           Attachments
         </p>
         {attachments.length > 0 && (
-          <FileAttachmentList files={attachments} onRemove={onRemoveAttachment} className="mb-2.5" />
+          <FileAttachmentList
+            files={attachments}
+            onRemove={onRemoveAttachment}
+            onRename={onRenameAttachment}
+            className="mb-2.5"
+          />
         )}
         <label
           className={`flex items-center justify-center text-center gap-2 px-3.5 py-2.5 rounded-xl border-2 border-dashed text-[12px] font-semibold cursor-pointer transition-colors flex-wrap ${
