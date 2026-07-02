@@ -56,6 +56,9 @@ export const useTheme = create<ThemeState>()(
 
 function applyAccent(accent: Accent) {
   document.documentElement.setAttribute("data-accent", accent);
+  // Also mirrored into a cookie (not just localStorage) so the server-rendered
+  // favicon (src/app/icon.tsx) can read the current accent per-request.
+  document.cookie = `accent=${accent}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
 function applyTheme(theme: Theme) {

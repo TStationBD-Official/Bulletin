@@ -10,6 +10,7 @@ import {
   getTopAuthors,
   subscribeToLatestPosts,
   resolveAuthor,
+  getSavedPostIds,
 } from "@/lib/firestore";
 import { getCategories, SEED_CATEGORIES } from "@/lib/categories";
 import { useStore } from "@/store/useStore";
@@ -22,6 +23,7 @@ import { Users, ArrowRight, User } from "lucide-react";
 import { relativeTime } from "@/lib/utils";
 import { BentoGrid, BentoTile } from "@/components/BentoGrid";
 import TrendingBox from "@/components/TrendingBox";
+import Footer from "@/components/Footer";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 
 export default function FeedPage() {
@@ -39,6 +41,12 @@ export default function FeedPage() {
   const { data: weeklyTrending = [] }  = useQuery({ queryKey: ["trending", "weekly"],  queryFn: getWeeklyTrendingPosts });
   const { data: monthlyTrending = [] } = useQuery({ queryKey: ["trending", "monthly"], queryFn: getMonthlyTrendingPosts });
   const { data: topAuthors = [] }      = useQuery({ queryKey: ["topAuthors"], queryFn: getTopAuthors });
+  const { data: savedPostIds = [] } = useQuery({
+    queryKey: ["savedPostIds", user?.uid, userRole],
+    queryFn: () => getSavedPostIds(user!.uid, userRole!),
+    enabled: !!user && !!userRole,
+  });
+  const savedIdSet = new Set(savedPostIds);
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -129,25 +137,17 @@ export default function FeedPage() {
   useLayoutEffect(() => {
     if (filteredPosts.length === 0) return;
 
+    // The page scrolls as a single unit at every breakpoint now, so the
+    // scroller is always the window — no responsive branching needed.
     const ctx = gsap.context(() => {
-      const mm = gsap.matchMedia();
-
-      const setupBatch = (scroller?: HTMLElement) => {
-        const cards = gsap.utils.toArray<HTMLElement>("[data-post-card]", feedColumnRef.current);
-        if (cards.length === 0) return;
-        gsap.set(cards, { opacity: 0, y: 16 });
-        ScrollTrigger.batch(cards, {
-          scroller,
-          start: "top 90%",
-          once: true,
-          onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08, overwrite: true }),
-        });
-      };
-
-      mm.add("(min-width: 1024px)", () => setupBatch(feedColumnRef.current ?? undefined));
-      mm.add("(max-width: 1023.98px)", () => setupBatch(undefined));
-
-      return () => mm.revert();
+      const cards = gsap.utils.toArray<HTMLElement>("[data-post-card]", feedColumnRef.current);
+      if (cards.length === 0) return;
+      gsap.set(cards, { opacity: 0, y: 16 });
+      ScrollTrigger.batch(cards, {
+        start: "top 90%",
+        once: true,
+        onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08, overwrite: true }),
+      });
     }, feedColumnRef);
 
     const id = requestAnimationFrame(() => ScrollTrigger.refresh());
@@ -163,12 +163,14 @@ export default function FeedPage() {
 
   return (
     /*
-     * On lg+ screens: main fills the remaining viewport height below the header
-     * and switches to a flex-col layout so the tab bar is fixed-height and
-     * the two-panel grid below gets its own independent scroll per column.
-     * On mobile: normal page scroll (min-h-screen, no overflow restriction).
+     * The whole page scrolls as one unit at every breakpoint (feed + sidebar
+     * move together). The category tab bar stays sticky under the header.
+     * The sidebar is sticky too, so it stays in view while scrolling the
+     * feed — but keeps its own bounded height + overflow-y-auto so it can
+     * still scroll independently if its own content is taller than the
+     * available viewport space.
      */
-    <main className="bg-gray-50/50 dark:bg-dark-bg min-h-screen lg:h-[calc(100vh-4rem)] lg:flex lg:flex-col lg:overflow-hidden">
+    <main className="bg-gray-50/50 dark:bg-dark-bg min-h-screen">
 
       {/* ── TuitionCore promo banner ──────────────────────────── */}
       <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4">
@@ -208,7 +210,7 @@ export default function FeedPage() {
       </div>
 
       {/* ── Category tabs ─────────────────────────────────────── */}
-      <div className="flex-shrink-0 bg-white/90 dark:bg-dark-bg/90 backdrop-blur-xl border-b border-gray-100 dark:border-dark-border z-30 sticky top-16 lg:static">
+      <div className="bg-white/90 dark:bg-dark-bg/90 backdrop-blur-xl border-b border-gray-100 dark:border-dark-border z-30 sticky top-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
             <button
@@ -242,13 +244,13 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* ── Two-panel area — each column scrolls independently on lg+ ── */}
-      <div className="flex-1 lg:overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-8 xl:gap-12 lg:h-full">
+      {/* ── Two-panel area — scrolls together as one page ────── */}
+      <div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-8 xl:gap-12 lg:items-start">
 
-            {/* ── Feed — independent scroll ─────────────────────── */}
-            <div ref={feedColumnRef} className="lg:overflow-y-auto lg:h-full py-6 scrollbar-hide">
+            {/* ── Feed ──────────────────────────────────────────── */}
+            <div ref={feedColumnRef} className="py-6">
 
               {/* Search banner */}
               {query && (
@@ -278,6 +280,7 @@ export default function FeedPage() {
                       post={post}
                       author={authorCache[post.authorId]}
                       index={i}
+                      isSaved={savedIdSet.has(post.id)}
                       disableMountAnimation
                     />
                   ))}
@@ -292,10 +295,16 @@ export default function FeedPage() {
                   </div>
                 </div>
               )}
+
+              {/* Footer lives at the natural end of the feed on lg+, since
+                  the page now scrolls as a single unit. */}
+              <div className="hidden lg:block mt-8">
+                <Footer />
+              </div>
             </div>
 
-            {/* ── Sidebar — independent scroll ──────────────────── */}
-            <aside className="hidden lg:flex lg:flex-col lg:overflow-y-auto lg:h-full py-6 scrollbar-hide">
+            {/* ── Sidebar — sticky, with its own scroll if it overflows ── */}
+            <aside className="hidden lg:flex lg:flex-col lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto py-6 scrollbar-hide">
               <BentoGrid cols="grid-cols-1" className="pb-8">
 
                 {/* Weekly Trending */}

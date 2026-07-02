@@ -20,14 +20,14 @@ export default function SavedPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || userRole !== "feeds_user") {
+    if (!user || !userRole) {
       router.push("/");
       return;
     }
 
     (async () => {
       try {
-        const savedPosts = await getSavedPosts(user.uid);
+        const savedPosts = await getSavedPosts(user.uid, userRole);
         setPosts(savedPosts);
 
         // Resolve authors

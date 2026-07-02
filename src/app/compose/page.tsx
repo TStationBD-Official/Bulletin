@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Globe, Lock, AlertCircle, CheckCircle2, User,
-  Send, HardDrive, RefreshCw, WifiOff, Info, ChevronDown, ChevronUp,
+  Send, HardDrive, RefreshCw, WifiOff, Info, ChevronDown, ChevronUp, Paperclip,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { createPost, checkRateLimit } from "@/lib/firestore";
-import { uploadImage } from "@/lib/drive";
+import { uploadImage, uploadFile } from "@/lib/drive";
 import { getCategories, seedDefaultCategories, SEED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
-import { Category } from "@/types";
+import { Category, FileAttachment } from "@/types";
+import FileAttachmentList from "@/components/FileAttachmentList";
 import { useStore } from "@/store/useStore";
 import { reconnectDrive } from "@/lib/driveAuth";
 import EmptyState from "@/components/EmptyState";
@@ -20,6 +21,17 @@ import { PageLoader } from "@/components/LoadingSpinner";
 import toast from "react-hot-toast";
 
 const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
+
+const ALLOWED_ATTACHMENT_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+];
 
 export default function ComposePage() {
   const router = useRouter();
@@ -41,6 +53,9 @@ export default function ComposePage() {
   const [rateLimited,        setRateLimited]        = useState(false);
   const [postsRemaining,     setPostsRemaining]     = useState<number | null>(null);
   const [maxPostsPerDay,     setMaxPostsPerDay]      = useState(10);
+
+  const [attachments,    setAttachments]    = useState<FileAttachment[]>([]);
+  const [uploadingFile,  setUploadingFile]  = useState(false);
 
   const roleLoading = user && !userRole;
   const userName    = (userData as any)?.name ?? user?.displayName ?? "Unknown";
@@ -117,6 +132,42 @@ export default function ComposePage() {
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-selecting the same file later
+    if (files.length === 0) return;
+
+    if (!accessToken) {
+      toast.error("Connect Google Drive to attach files");
+      return;
+    }
+
+    const rejected = files.filter((f) => !ALLOWED_ATTACHMENT_TYPES.includes(f.type));
+    const valid = files.filter((f) => ALLOWED_ATTACHMENT_TYPES.includes(f.type));
+    if (rejected.length > 0) {
+      toast.error(`Unsupported file type: ${rejected.map((f) => f.name).join(", ")}`);
+    }
+    if (valid.length === 0) return;
+
+    setUploadingFile(true);
+    try {
+      for (const file of valid) {
+        try {
+          const { url } = await uploadFile(file, accessToken, `tmp_${Date.now()}`);
+          setAttachments((prev) => [...prev, { url, name: file.name, mimeType: file.type, size: file.size }]);
+        } catch {
+          toast.error(`Failed to upload ${file.name}`);
+        }
+      }
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (plainText.length < 10) {
@@ -183,6 +234,7 @@ export default function ComposePage() {
         content: plainText.slice(0, 500),
         richContent: htmlContent || cleanDelta,
         imageUrls,
+        fileAttachments: attachments,
         visibility: showVisibility ? visibility : "public",
         status: autoApproved ? "approved" : "pending",
         adminId: autoApproved ? user!.uid : undefined,
@@ -420,6 +472,10 @@ export default function ComposePage() {
                           accessToken={accessToken}
                           reconnecting={reconnecting}
                           onReconnectDrive={handleReconnectDrive}
+                          attachments={attachments}
+                          uploadingFile={uploadingFile}
+                          onFileSelect={handleFileSelect}
+                          onRemoveAttachment={handleRemoveAttachment}
                         />
                       </div>
                     </motion.div>
@@ -483,6 +539,10 @@ export default function ComposePage() {
                   accessToken={accessToken}
                   reconnecting={reconnecting}
                   onReconnectDrive={handleReconnectDrive}
+                  attachments={attachments}
+                  uploadingFile={uploadingFile}
+                  onFileSelect={handleFileSelect}
+                  onRemoveAttachment={handleRemoveAttachment}
                 />
 
                 {/* Action buttons */}
@@ -565,12 +625,18 @@ interface SidebarContentProps {
   accessToken: string | null;
   reconnecting: boolean;
   onReconnectDrive: () => void;
+  /* attachments */
+  attachments: FileAttachment[];
+  uploadingFile: boolean;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment: (index: number) => void;
 }
 
 function SidebarContent({
   categories, selectedCategoryId, setSelectedCategoryId, selectedCat,
   showVisibility, visibility, setVisibility, internalDescription,
   autoApproved, photoURL, userName, accessToken, reconnecting, onReconnectDrive,
+  attachments, uploadingFile, onFileSelect, onRemoveAttachment,
 }: SidebarContentProps) {
   return (
     <div className="space-y-6">
@@ -627,6 +693,42 @@ function SidebarContent({
           </button>
         </div>
       )}
+
+      {/* ── Attachments ───────────────────────────────────────── */}
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 dark:text-dark-tertiary uppercase tracking-widest mb-3">
+          Attachments
+        </p>
+        {attachments.length > 0 && (
+          <FileAttachmentList files={attachments} onRemove={onRemoveAttachment} className="mb-2.5" />
+        )}
+        <label
+          className={`flex items-center justify-center text-center gap-2 px-3.5 py-2.5 rounded-xl border-2 border-dashed text-[12px] font-semibold cursor-pointer transition-colors flex-wrap ${
+            uploadingFile
+              ? "border-gray-200 dark:border-dark-border text-gray-300 dark:text-dark-muted cursor-not-allowed"
+              : "border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-tertiary hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50/50 dark:hover:bg-brand-900/10"
+          }`}
+        >
+          {uploadingFile ? (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+              className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full flex-shrink-0"
+            />
+          ) : (
+            <Paperclip size={14} className="flex-shrink-0" />
+          )}
+          <span>{uploadingFile ? "Uploading…" : "Attach PDF, Word, Excel, PowerPoint or text file"}</span>
+          <input
+            type="file"
+            multiple
+            accept="application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,text/plain"
+            onChange={onFileSelect}
+            disabled={uploadingFile}
+            className="hidden"
+          />
+        </label>
+      </div>
 
       {/* Category */}
       {categories.length > 0 && (

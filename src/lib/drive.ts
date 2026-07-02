@@ -1,8 +1,8 @@
-export async function uploadToDrive(
+async function uploadRawToDrive(
   file: File,
   accessToken: string,
   folderId?: string
-): Promise<string> {
+): Promise<string /* Drive file id */> {
   const metadata = {
     name: `${Date.now()}_${file.name}`,
     mimeType: file.type,
@@ -30,8 +30,18 @@ export async function uploadToDrive(
   });
   if (!permRes.ok) throw new Error(`Failed to set Drive file public: ${permRes.statusText}`);
 
-  // lh3.googleusercontent.com/d/{id} is Google's CDN URL for Drive files.
+  return id;
+}
+
+export async function uploadToDrive(
+  file: File,
+  accessToken: string,
+  folderId?: string
+): Promise<string> {
+  const id = await uploadRawToDrive(file, accessToken, folderId);
+  // lh3.googleusercontent.com/d/{id} is Google's image CDN URL for Drive files.
   // It serves the file directly to anyone without auth when role=reader/type=anyone is set.
+  // Only reliable for images — use uploadFile() below for non-image attachments.
   return `https://lh3.googleusercontent.com/d/${id}`;
 }
 
@@ -45,4 +55,21 @@ export async function uploadImage(
   }
   const folderId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_ID || undefined;
   return uploadToDrive(file, accessToken, folderId);
+}
+
+// For non-image file attachments (PDF, Word, Excel, PowerPoint, text). Returns
+// Drive's own viewer URL, which opens Google's native in-browser preview —
+// unlike the lh3 image CDN used by uploadToDrive/uploadImage, this reliably
+// serves arbitrary file types.
+export async function uploadFile(
+  file: File,
+  accessToken: string | null,
+  postId: string
+): Promise<{ url: string; id: string }> {
+  if (!accessToken) {
+    throw new Error("Google Drive not connected. Please sign out and sign in again.");
+  }
+  const folderId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_ID || undefined;
+  const id = await uploadRawToDrive(file, accessToken, folderId);
+  return { url: `https://drive.google.com/file/d/${id}/view`, id };
 }

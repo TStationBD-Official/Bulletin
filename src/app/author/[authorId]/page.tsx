@@ -5,7 +5,9 @@ import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowLeft, User } from "lucide-react";
-import { getAuthorPosts, resolveAuthor } from "@/lib/firestore";
+import { getAuthorPosts, resolveAuthor, getSavedPostIds } from "@/lib/firestore";
+import { useQuery } from "@tanstack/react-query";
+import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile } from "@/types";
 import PostCard from "@/components/PostCard";
 import EmptyState from "@/components/EmptyState";
@@ -14,10 +16,18 @@ import { PageLoader } from "@/components/LoadingSpinner";
 export default function AuthorPage() {
   const params = useParams();
   const authorId = params.authorId as string;
+  const { user, userRole } = useStore();
 
   const [author, setAuthor] = useState<AuthorProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { data: savedPostIds = [] } = useQuery({
+    queryKey: ["savedPostIds", user?.uid, userRole],
+    queryFn: () => getSavedPostIds(user!.uid, userRole!),
+    enabled: !!user && !!userRole,
+  });
+  const savedIdSet = new Set(savedPostIds);
 
   useEffect(() => {
     (async () => {
@@ -123,6 +133,7 @@ export default function AuthorPage() {
                     post={post}
                     author={author}
                     index={i}
+                    isSaved={savedIdSet.has(post.id)}
                   />
                 </motion.div>
               ))}

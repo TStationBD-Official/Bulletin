@@ -306,8 +306,17 @@ html {
 }
 .ql-toolbar.ql-snow {
   border-bottom: 1px solid #e5e7eb !important;
-  padding: 8px 12px;
+  padding: 8px 12px 4px;
   background: #fafafa;
+  /* Wrap into clean multiple rows on narrow screens instead of a single
+     cramped/scrolling row — every tool stays visible and reachable. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 6px;
+}
+.ql-toolbar.ql-snow .ql-formats {
+  margin-bottom: 4px !important;
 }
 .ql-container {
   font-family: inherit;

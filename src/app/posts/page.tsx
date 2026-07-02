@@ -10,8 +10,10 @@ import {
   getWeeklyTrendingPosts,
   getMonthlyTrendingPosts,
   getTopAuthors,
+  getSavedPostIds,
 } from "@/lib/firestore";
 import { getCategories, SEED_CATEGORIES } from "@/lib/categories";
+import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile, Category } from "@/types";
 import { toDate } from "@/lib/utils";
 import PostCard from "@/components/PostCard";
@@ -96,6 +98,7 @@ export default function AllPostsPage() {
   const query          = searchParams.get("q")?.toLowerCase() || "";
   const categoryFilter = searchParams.get("c") || null;
 
+  const { user, userRole } = useStore();
   const [authorCache, setAuthorCache] = useState<Record<string, AuthorProfile | null>>({});
 
   // Date filter state
@@ -142,6 +145,12 @@ export default function AllPostsPage() {
   const { data: weeklyTrending = [] } = useQuery({ queryKey: ["trending", "weekly"], queryFn: getWeeklyTrendingPosts });
   const { data: monthlyTrending = [] } = useQuery({ queryKey: ["trending", "monthly"], queryFn: getMonthlyTrendingPosts });
   const { data: topAuthors = [] } = useQuery({ queryKey: ["topAuthors"], queryFn: getTopAuthors });
+  const { data: savedPostIds = [] } = useQuery({
+    queryKey: ["savedPostIds", user?.uid, userRole],
+    queryFn: () => getSavedPostIds(user!.uid, userRole!),
+    enabled: !!user && !!userRole,
+  });
+  const savedIdSet = new Set(savedPostIds);
 
   const loading = postsLoading || categoriesLoading;
 
@@ -405,6 +414,7 @@ export default function AllPostsPage() {
                     post={post}
                     author={authorCache[post.authorId]}
                     index={i}
+                    isSaved={savedIdSet.has(post.id)}
                   />
                 ))}
 

@@ -265,7 +265,7 @@ export default function Header() {
                           {unreadCount > 0 && (
                             <button
                               onClick={() => markAllNotificationsRead(user.uid)}
-                              className="text-xs text-brand-500 hover:text-brand-600 font-medium transition-colors"
+                              className="text-xs bg-brand-500 hover:bg-brand-600 text-white font-semibold px-2.5 py-1 rounded-full transition-colors"
                             >
                               Mark all read
                             </button>
@@ -283,12 +283,12 @@ export default function Header() {
                               <div
                                 key={n.id}
                                 onClick={() => markNotificationRead(n.id)}
-                                className={`px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-dark-border/40 cursor-pointer transition-colors ${
-                                  !n.isRead ? "bg-brand-50/50 dark:bg-brand-950/20" : ""
+                                className={`relative px-4 py-3.5 pl-5 hover:bg-gray-50 dark:hover:bg-dark-border/40 cursor-pointer transition-colors ${
+                                  !n.isRead ? "bg-brand-50 dark:bg-brand-900/30" : ""
                                 }`}
                               >
                                 {!n.isRead && (
-                                  <span className="inline-block w-1.5 h-1.5 bg-brand-500 rounded-full mr-2 mb-0.5 align-middle" />
+                                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-2 h-2 bg-brand-500 rounded-full shadow-sm" />
                                 )}
                                 {n.isUrgent && (
                                   <span className="text-[10px] font-bold text-red-500 uppercase tracking-wide">
@@ -366,9 +366,9 @@ export default function Header() {
                           {[
                             { href: "/profile", icon: User, label: "My Profile" },
                             { href: "/profile?tab=drive", icon: HardDrive, label: "Drive & Storage", badge: accessToken ? "ON" : "OFF", badgeOk: !!accessToken },
+                            { href: "/saved", icon: Bookmark, label: "Saved Posts" },
                             ...(userRole === "feeds_user" || userRole === "admin"
                               ? [
-                                  { href: "/saved", icon: Bookmark, label: "Saved Posts" },
                                   { href: "/compose", icon: PenSquare, label: "Write Post" },
                                 ]
                               : []),

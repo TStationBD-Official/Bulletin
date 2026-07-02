@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useStore } from "@/store/useStore";
 import Logo from "./Logo";
 
@@ -16,7 +17,13 @@ export default function Footer() {
   ].filter((p) => !!p.content?.trim());
 
   return (
-    <footer className="border-t border-gray-100 dark:border-dark-border bg-white dark:bg-dark-bg mt-16">
+    <motion.footer
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="border-t border-gray-100 dark:border-dark-border bg-white dark:bg-dark-bg mt-16"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
         <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:justify-between gap-3 sm:gap-6">
           {/* Brand */}
@@ -60,6 +67,6 @@ export default function Footer() {
           </div>
         </div>
       </div>
-    </footer>
+    </motion.footer>
   );
 }

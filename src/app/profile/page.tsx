@@ -5,10 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  ArrowLeft, User, FileText, Heart, MessageCircle, Eye,
+  ArrowLeft, User, FileText, Heart, MessageCircle, Eye, Bookmark,
   HardDrive, RefreshCw, CheckCircle2, AlertCircle, LogOut,
 } from "lucide-react";
-import { getMyPosts, resolveAuthor } from "@/lib/firestore";
+import { getMyPosts, resolveAuthor, getSavedPostIds } from "@/lib/firestore";
+import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile } from "@/types";
 import PostCard from "@/components/PostCard";
@@ -36,6 +37,13 @@ export default function ProfilePage() {
   const displayName = (userData as any)?.name ?? user?.displayName ?? "";
   const photoURL    = (userData as any)?.profileImageUrl ?? user?.photoURL ?? null;
   const email       = (userData as any)?.email ?? user?.email ?? "";
+
+  const { data: savedPostIds = [] } = useQuery({
+    queryKey: ["savedPostIds", user?.uid, userRole],
+    queryFn: () => getSavedPostIds(user!.uid, userRole!),
+    enabled: !!user && !!userRole,
+  });
+  const savedIdSet = new Set(savedPostIds);
 
   useEffect(() => {
     if (!user) { router.replace("/"); return; }
@@ -142,6 +150,18 @@ export default function ProfilePage() {
               <p className="text-xs text-gray-400 dark:text-dark-tertiary">{label}</p>
             </BentoTile>
           ))}
+
+          <BentoTile
+            colSpan="col-span-2 sm:col-span-2 lg:col-span-1"
+            className="flex flex-col items-center justify-center text-center gap-2 p-4 cursor-pointer hover:border-brand-200 dark:hover:border-brand-800 transition-colors"
+            onClick={() => router.push("/saved")}
+          >
+            <div className={`p-3 rounded-xl ${colorMap.orange}`}>
+              <Bookmark size={18} />
+            </div>
+            <p className="text-xl font-bold text-gray-900 dark:text-dark-primary">Saved</p>
+            <p className="text-xs text-gray-400 dark:text-dark-tertiary">View your bookmarks</p>
+          </BentoTile>
         </BentoGrid>
 
         {/* Tabs */}
@@ -193,7 +213,7 @@ export default function ProfilePage() {
                           {post.status === "pending" ? "⏳ Pending review" : post.status === "rejected" ? "❌ Rejected" : post.status}
                         </div>
                       )}
-                      <PostCard post={post} author={authorProfile} index={i} />
+                      <PostCard post={post} author={authorProfile} index={i} isSaved={savedIdSet.has(post.id)} />
                     </div>
                   ))}
                 </div>

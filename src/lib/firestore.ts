@@ -37,6 +37,7 @@ import {
   AuthorProfile,
   UserRole,
   AdminStats,
+  FileAttachment,
 } from "@/types";
 
 // ─── Author Resolution ────────────────────────────────────────────────────────
@@ -297,6 +298,7 @@ export async function createPost(data: {
   content: string;
   richContent: string | null;
   imageUrls: string[];
+  fileAttachments?: FileAttachment[];
   visibility: "public" | "internal";
   status: "pending" | "approved";
   adminId?: string;
@@ -409,21 +411,54 @@ export async function sharePost(postId: string, userId: string) {
 import { setDoc } from "firebase/firestore";
 
 // ─── Saved Posts ──────────────────────────────────────────────────────────────
+// feeds_user accounts keep using feeds_user_only.savedPosts (existing data,
+// and that collection allows self-update). Every other role (superAdmin,
+// admin, student, guardian) has read-only Firestore rules on its own
+// collection, so their saved posts live on users_metadata instead — that
+// collection already allows self-update of any field except role/selectedRole,
+// so no security rules change is needed.
 
-export async function savePost(userId: string, postId: string) {
-  await updateDoc(doc(db, "feeds_user_only", userId), {
-    savedPosts: arrayUnion(postId),
-  });
+function savedPostsDocRef(userId: string, role: UserRole) {
+  return role === "feeds_user"
+    ? doc(db, "feeds_user_only", userId)
+    : doc(db, "users_metadata", userId);
 }
 
-export async function unsavePost(userId: string, postId: string) {
-  await updateDoc(doc(db, "feeds_user_only", userId), {
-    savedPosts: arrayRemove(postId),
-  });
+export async function savePost(userId: string, postId: string, role: UserRole) {
+  const ref = savedPostsDocRef(userId, role);
+  if (role === "feeds_user") {
+    await updateDoc(ref, { savedPosts: arrayUnion(postId) });
+  } else {
+    await setDoc(ref, { savedPosts: arrayUnion(postId) }, { merge: true });
+  }
 }
 
-export async function getSavedPosts(userId: string): Promise<Post[]> {
-  const userSnap = await getDoc(doc(db, "feeds_user_only", userId));
+export async function unsavePost(userId: string, postId: string, role: UserRole) {
+  const ref = savedPostsDocRef(userId, role);
+  if (role === "feeds_user") {
+    await updateDoc(ref, { savedPosts: arrayRemove(postId) });
+  } else {
+    await setDoc(ref, { savedPosts: arrayRemove(postId) }, { merge: true });
+  }
+}
+
+export async function isPostSaved(postId: string, userId: string, role: UserRole): Promise<boolean> {
+  const snap = await getDoc(savedPostsDocRef(userId, role));
+  if (!snap.exists()) return false;
+  const savedIds: string[] = snap.data().savedPosts ?? [];
+  return savedIds.includes(postId);
+}
+
+// Just the saved post IDs (cheap — no post doc fetches) for populating a
+// feed's bookmark icons without a per-card round trip.
+export async function getSavedPostIds(userId: string, role: UserRole): Promise<string[]> {
+  const snap = await getDoc(savedPostsDocRef(userId, role));
+  if (!snap.exists()) return [];
+  return snap.data().savedPosts ?? [];
+}
+
+export async function getSavedPosts(userId: string, role: UserRole): Promise<Post[]> {
+  const userSnap = await getDoc(savedPostsDocRef(userId, role));
   if (!userSnap.exists()) return [];
   const savedIds: string[] = userSnap.data().savedPosts ?? [];
   if (savedIds.length === 0) return [];

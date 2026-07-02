@@ -29,9 +29,17 @@ googleProvider.addScope("https://www.googleapis.com/auth/drive.file");
 // scripted traffic without a real reCAPTCHA-passing browser can be rejected once
 // enforcement is turned on in the Firebase Console. Safe no-op until
 // NEXT_PUBLIC_RECAPTCHA_SITE_KEY is configured — see .env.example.
+// Uses the free classic reCAPTCHA v3 (google.com/recaptcha/admin), not
+// reCAPTCHA Enterprise — Enterprise costs money past 10k assessments/month
+// and needs a Cloud Billing account, unnecessary for this use case.
 if (typeof window !== "undefined") {
   if (process.env.NODE_ENV !== "production") {
-    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    // A fixed token registered in Firebase Console > App Check > Manage debug
+    // tokens lets local dev bypass real reCAPTCHA verification. Falls back to
+    // `true` (auto-generates a token and logs it to console for one-time
+    // registration) if no fixed token is configured yet.
+    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN =
+      process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN || true;
   }
   const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (recaptchaSiteKey) {

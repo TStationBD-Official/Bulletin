@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
@@ -17,8 +20,20 @@ export default function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center py-16 text-center", className)}>
-      <span className="text-5xl mb-4">{icon}</span>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className={cn("flex flex-col items-center justify-center py-16 text-center", className)}
+    >
+      <motion.span
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+        className="text-5xl mb-4"
+      >
+        {icon}
+      </motion.span>
       <h3 className="text-lg font-semibold text-gray-800 dark:text-dark-primary mb-1">{title}</h3>
       {description && (
         <p className="text-sm text-gray-500 dark:text-dark-secondary max-w-sm mb-5">{description}</p>
@@ -39,6 +54,6 @@ export default function EmptyState({
             {action.label}
           </button>
         ))}
-    </div>
+    </motion.div>
   );
 }

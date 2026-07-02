@@ -10,13 +10,14 @@ import {
 } from "lucide-react";
 import {
   getPost, resolveAuthor, isPostLiked, trackView,
-  likePost, unlikePost, savePost, unsavePost,
+  likePost, unlikePost, savePost, unsavePost, isPostSaved,
 } from "@/lib/firestore";
 import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile } from "@/types";
 import { relativeTime, formatDate, readingTime, extractPlainText } from "@/lib/utils";
 import CommentSection from "@/components/CommentSection";
 import { PostImages } from "@/components/ImageGallery";
+import FileAttachmentList from "@/components/FileAttachmentList";
 import ShareModal from "@/components/ShareModal";
 import ReportModal from "@/components/ReportModal";
 import { PageLoader } from "@/components/LoadingSpinner";
@@ -31,7 +32,7 @@ export default function PostPage() {
   const params = useParams();
   const postId = params.id as string;
 
-  const { user, userData, userRole, settings } = useStore();
+  const { user, userRole, settings } = useStore();
   const allowSharing = settings?.allowSharing !== false;
 
   const [post,        setPost]        = useState<Post | null>(null);
@@ -102,11 +103,9 @@ export default function PostPage() {
         setAuthor(auth);
         setLiked(isLiked);
 
-        if (user) {
+        if (user && userRole) {
           trackView(postId, user.uid).catch(() => {});
-          if (userRole === "feeds_user") {
-            setSaved((userData as any)?.savedPosts?.includes(postId) ?? false);
-          }
+          isPostSaved(postId, user.uid, userRole).then(setSaved).catch(() => {});
         }
       } finally {
         setLoading(false);
@@ -132,19 +131,20 @@ export default function PostPage() {
   };
 
   const handleSave = () => {
-    if (!user || userRole !== "feeds_user") {
-      toast.error("Sign in as a website user to save posts");
+    if (!user || !userRole) {
+      toast.error("Sign in to save posts");
       return;
     }
     saveCooldown(async () => {
       const next = !saved;
       setSaved(next);
       try {
-        if (next) await savePost(user.uid, postId);
-        else await unsavePost(user.uid, postId);
+        if (next) await savePost(user.uid, postId, userRole);
+        else await unsavePost(user.uid, postId, userRole);
         toast.success(next ? "Post saved!" : "Removed from saved");
-      } catch {
+      } catch (err: any) {
         setSaved(!next);
+        toast.error(err?.message || "Couldn't update saved posts");
       }
     });
   };
@@ -198,7 +198,7 @@ export default function PostPage() {
                 )}
               </button>
 
-              {userRole === "feeds_user" && (
+              {userRole && (
                 <motion.button
                   whileTap={{ scale: 1.2 }}
                   transition={{ type: "spring", stiffness: 300, damping: 15 }}
@@ -206,7 +206,7 @@ export default function PostPage() {
                   title={saved ? "Remove from saved" : "Save"}
                   className={`p-2.5 rounded-full transition-colors ${
                     saved
-                      ? "text-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                      ? "bg-brand-500 text-white shadow-sm"
                       : "text-gray-400 dark:text-dark-tertiary hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20"
                   }`}
                 >
@@ -335,6 +335,13 @@ export default function PostPage() {
                 </div>
               )}
 
+              {/* File attachments */}
+              {post.fileAttachments && post.fileAttachments.length > 0 && (
+                <div className="mt-8">
+                  <FileAttachmentList files={post.fileAttachments} />
+                </div>
+              )}
+
               {/* ── Mobile action bar ─────────────────────── */}
               <div className="flex items-center gap-2 mt-8 pt-6 border-t border-gray-100 dark:border-dark-border lg:hidden flex-wrap">
                 <motion.button
@@ -359,13 +366,13 @@ export default function PostPage() {
                   </button>
                 )}
 
-                {userRole === "feeds_user" && (
+                {userRole && (
                   <motion.button
                     whileTap={{ scale: 1.1 }}
                     onClick={handleSave}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                       saved
-                        ? "text-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                        ? "bg-brand-500 text-white shadow-sm"
                         : "text-gray-600 dark:text-dark-secondary hover:bg-gray-100 dark:hover:bg-dark-border"
                     }`}
                   >

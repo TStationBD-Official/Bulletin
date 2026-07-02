@@ -62,6 +62,15 @@ export interface Post {
   categoryIcon?: string;
   // Title (optional — old posts without title just show content preview)
   title?: string;
+  // Non-image file attachments (PDF, Word, Excel, PowerPoint, text)
+  fileAttachments?: FileAttachment[];
+}
+
+export interface FileAttachment {
+  url: string;
+  name: string;
+  mimeType: string;
+  size?: number;
 }
 
 export interface EditHistoryEntry {

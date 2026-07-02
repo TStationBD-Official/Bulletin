@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Sun, Moon, Laptop, Check } from "lucide-react";
 import { useTheme, ACCENTS } from "@/store/useTheme";
 
@@ -39,10 +40,15 @@ export default function ThemeToggle() {
         <currentTheme.icon size={20} className="text-gray-600 dark:text-gray-400" />
       </button>
 
-      {open && (
+      <AnimatePresence>
+        {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="absolute right-0 top-full mt-2 w-48 rounded-xl shadow-2xl overflow-hidden z-50"
             style={{ background: dropdownBg, border: `1px solid ${borderColor}` }}
           >
@@ -98,9 +104,10 @@ export default function ThemeToggle() {
                 })}
               </div>
             </div>
-          </div>
+          </motion.div>
         </>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }
