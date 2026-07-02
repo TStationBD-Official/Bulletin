@@ -129,11 +129,11 @@ export default function CategoriesPage() {
     <main className="p-6 bg-gray-50 dark:bg-dark-bg min-h-screen">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <Tag size={28} className="text-brand-500" />
+            <Tag size={28} className="text-brand-500 flex-shrink-0" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-dark-primary">Categories</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-dark-primary">Categories</h1>
               <p className="text-gray-500 dark:text-dark-tertiary text-sm mt-0.5">
                 {categories.length} categories · {categories.filter((c) => c.isActive).length} active
               </p>
@@ -141,7 +141,7 @@ export default function CategoriesPage() {
           </div>
           <button
             onClick={openNew}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition-colors w-full sm:w-auto"
           >
             <Plus size={16} /> New Category
           </button>
@@ -271,8 +271,8 @@ export default function CategoriesPage() {
         </AnimatePresence>
 
         {/* Category table */}
-        <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border shadow-card overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border shadow-card overflow-x-auto">
+          <table className="w-full min-w-[560px]">
             <thead>
               <tr className="border-b border-gray-100 dark:border-dark-border">
                 <th className="text-left text-xs font-semibold text-gray-500 dark:text-dark-tertiary uppercase tracking-wide px-5 py-3">Category</th>

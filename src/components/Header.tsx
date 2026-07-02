@@ -250,7 +250,7 @@ export default function Header() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                        className="absolute right-0 top-full mt-2.5 w-[min(22rem,calc(100vw-2rem))] bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-black/10 dark:shadow-black/30 border border-gray-200/60 dark:border-dark-border/60 overflow-hidden"
+                        className="fixed left-4 right-4 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2.5 sm:w-[min(22rem,calc(100vw-2rem))] bg-white/95 dark:bg-dark-card/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-black/10 dark:shadow-black/30 border border-gray-200/60 dark:border-dark-border/60 overflow-hidden"
                       >
                         <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-dark-border/60">
                           <div className="flex items-center gap-2">

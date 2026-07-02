@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -93,6 +93,14 @@ function TrendingList({
 }
 
 export default function AllPostsPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <AllPostsPageInner />
+    </Suspense>
+  );
+}
+
+function AllPostsPageInner() {
   const searchParams   = useSearchParams();
   const router         = useRouter();
   const query          = searchParams.get("q")?.toLowerCase() || "";

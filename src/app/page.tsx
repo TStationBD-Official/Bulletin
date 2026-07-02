@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +27,14 @@ import Footer from "@/components/Footer";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 
 export default function FeedPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <FeedPageInner />
+    </Suspense>
+  );
+}
+
+function FeedPageInner() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const query        = searchParams.get("q")?.toLowerCase() || "";

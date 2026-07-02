@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -22,6 +22,14 @@ import { storeDriveToken } from "@/lib/driveAuth";
 import { colorMap } from "@/components/admin/StatsCard";
 
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProfilePageInner />
+    </Suspense>
+  );
+}
+
+function ProfilePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, userData, userRole, accessToken, setAccessToken } = useStore();

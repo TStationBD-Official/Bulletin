@@ -176,7 +176,7 @@ export default function ReportedContentPage() {
     }
   };
 
-  const handleStatusUpdate = async (reportId: string, newStatus: ReportStatus) => {
+  const handleStatusUpdate = async (reportId: string, newStatus: "open" | "reviewing") => {
     try {
       await updateReportStatus(reportId, newStatus);
       setReports((r) => r.map((x) => (x.id === reportId ? { ...x, status: newStatus } : x)));

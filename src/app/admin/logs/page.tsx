@@ -65,7 +65,7 @@ export default function LogsPage() {
         setLogs(allLogs);
 
         // Resolve admin names
-        const adminIds = [...new Set(allLogs.map((l) => l.adminId))];
+        const adminIds = Array.from(new Set(allLogs.map((l) => l.adminId)));
         const adminC: Record<string, AuthorProfile | null> = {};
         await Promise.all(adminIds.map(async (id) => { adminC[id] = await resolveAuthor(id); }));
         setAdminCache(adminC);
@@ -121,7 +121,7 @@ export default function LogsPage() {
       if (!map.has(label)) map.set(label, []);
       map.get(label)!.push(l);
     });
-    return [...map.entries()];
+    return Array.from(map.entries());
   }, [filtered]);
 
   // Stats

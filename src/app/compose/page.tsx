@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -36,6 +36,14 @@ const ALLOWED_ATTACHMENT_TYPES = [
 ];
 
 export default function ComposePage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ComposePageInner />
+    </Suspense>
+  );
+}
+
+function ComposePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editPostId = searchParams.get("edit");

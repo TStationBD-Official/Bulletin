@@ -31,11 +31,11 @@ export default function SavedPage() {
         setPosts(savedPosts);
 
         // Resolve authors
-        const authorIds = [...new Set(savedPosts.map((p) => p.authorId))];
+        const authorIds = Array.from(new Set(savedPosts.map((p) => p.authorId)));
         const resolved: Record<string, AuthorProfile | null> = {};
         await Promise.all(
           authorIds.map(async (id) => {
-            resolved[id] = await resolveAuthor(id);
+            resolved[id] = await resolveAuthor(id).catch(() => null);
           })
         );
         setAuthorCache(resolved);
