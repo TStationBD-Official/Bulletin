@@ -192,6 +192,25 @@ export function getWeeklyTrendingPosts(): Promise<Post[]> {
   return getTrendingPostsSince(7);
 }
 
+// Related posts for the post detail page: same category, approved + public,
+// ranked by engagement, excluding the post being viewed. Single-field query
+// (categoryId only) + client-side filter/sort — avoids a categoryId+status+
+// visibility composite index.
+export async function getRelatedPosts(
+  categoryId: string,
+  excludePostId: string,
+  take = 2
+): Promise<Post[]> {
+  const snap = await getDocs(
+    query(collection(db, "posts"), where("categoryId", "==", categoryId), limit(50))
+  );
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as Post))
+    .filter((p) => p.id !== excludePostId && p.status === "approved" && p.visibility === "public")
+    .sort((a, b) => engagementScore(b) - engagementScore(a))
+    .slice(0, take);
+}
+
 export function getMonthlyTrendingPosts(): Promise<Post[]> {
   return getTrendingPostsSince(30);
 }

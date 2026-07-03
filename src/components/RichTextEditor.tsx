@@ -207,6 +207,24 @@ interface SelectedImg {
   align: string;
 }
 
+// Content pasted from external sites (Wikipedia, Word, Google Docs, etc.)
+// brings its own inline text-color/background styles tuned for a white page.
+// Those inline styles beat our .dark article-body color rules regardless of
+// specificity, so pasted text can end up unreadable in dark mode. Strip only
+// color/background — everything else (bold, italic, font, size, headers,
+// links, lists) is preserved, matching the "preserve source formatting" intent.
+function stripPastedColors(html: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.body.querySelectorAll<HTMLElement>("[style]").forEach((el) => {
+    el.style.removeProperty("color");
+    el.style.removeProperty("background-color");
+    el.style.removeProperty("background");
+    if (!el.style.length) el.removeAttribute("style");
+  });
+  return doc.body.innerHTML;
+}
+
 export default function RichTextEditor({
   value,
   onChange,
@@ -257,7 +275,7 @@ export default function RichTextEditor({
       const range = quill.getSelection(true);
       const index = range?.index ?? quill.getLength();
       if (range?.length) quill.deleteText(range.index, range.length, "user");
-      quill.clipboard.dangerouslyPasteHTML(index, html, "user");
+      quill.clipboard.dangerouslyPasteHTML(index, stripPastedColors(html), "user");
     };
 
     quill.root.addEventListener("paste", handlePaste);
@@ -327,34 +345,71 @@ export default function RichTextEditor({
     });
   }, [accessToken, postId]);
 
-  // Route a format change through Quill's own formatText() API rather than
-  // mutating the DOM directly. quill.formatText() synchronously calls the
-  // blot's format() (applies the visual style) AND updates Quill's Delta
-  // model in the same tick — mutating el.style directly and waiting for
+  // Apply the change directly to the DOM first — this is what makes it
+  // visible immediately and always works, regardless of Quill's internal
+  // blot bookkeeping. Then, best-effort, also route it through Quill's
+  // formatText() API so the change lands in Quill's own Delta model (needed
+  // so it actually gets saved — mutating el.style alone and waiting for
   // Quill's async MutationObserver to notice was a race: editor.getContents()
-  // (called right after, to save) could run before Quill re-synced, so the
-  // change silently never made it into the saved delta.
+  // could run before Quill re-synced, so the change silently never made it
+  // into the saved delta). If the blot lookup fails for any reason, the
+  // visual change above still stands instead of the whole thing silently
+  // no-oping.
   const applyBlotFormat = (name: "width" | "imgAlign", value: string) => {
-    if (!selectedImg) return null;
+    if (!selectedImg) return;
+    const el = selectedImg.el;
+
+    if (name === "width") {
+      if (value) {
+        el.style.width = value;
+        el.setAttribute("width", value);
+      } else {
+        el.style.removeProperty("width");
+        el.removeAttribute("width");
+      }
+    } else {
+      el.style.removeProperty("display");
+      el.style.removeProperty("margin-left");
+      el.style.removeProperty("margin-right");
+      if (value) {
+        el.setAttribute("data-align", value);
+        if (value === "center") {
+          el.style.display = "block";
+          el.style.marginLeft = "auto";
+          el.style.marginRight = "auto";
+        } else if (value === "right") {
+          el.style.display = "block";
+          el.style.marginLeft = "auto";
+          el.style.marginRight = "0";
+        }
+      } else {
+        el.removeAttribute("data-align");
+      }
+    }
+
     const quill = quillRef.current?.getEditor?.();
-    if (!quill) return null;
-    const blot = _Quill?.find?.(selectedImg.el);
-    if (!blot) return null;
-    const index = quill.getIndex(blot);
-    quill.formatText(index, 1, name, value || false, "user");
-    onChange(quill.root.innerHTML, {}, "user", quill as any);
-    return quill;
+    try {
+      const blot = quill && _Quill?.find?.(el);
+      if (quill && blot) {
+        const index = quill.getIndex(blot);
+        quill.formatText(index, 1, name, value || false, "user");
+      }
+    } catch (err) {
+      console.error(`Failed to sync ${name} into the editor's saved content:`, err);
+    }
+
+    if (quill) onChange(quill.root.innerHTML, {}, "user", quill as any);
   };
 
   // ── Resize apply ──────────────────────────────────────────────────────────
   const applyResize = (size: string) => {
-    if (!applyBlotFormat("width", size)) return;
+    applyBlotFormat("width", size);
     setSelectedImg(prev => prev ? { ...prev, width: size } : null);
   };
 
   // ── Align apply ───────────────────────────────────────────────────────────
   const applyAlign = (align: string) => {
-    if (!applyBlotFormat("imgAlign", align)) return;
+    applyBlotFormat("imgAlign", align);
     setSelectedImg(prev => prev ? { ...prev, align } : null);
   };
 

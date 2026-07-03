@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Providers from "./providers";
 import ConditionalHeader from "@/components/ConditionalHeader";
@@ -52,6 +53,12 @@ export default function RootLayout({
         <ThemeInitializer />
       </head>
       <body className={`${inter.className} bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-primary antialiased transition-colors`}>
+        {/* Google Identity Services — required for silent Drive access-token
+            refresh (see src/lib/driveAuth.ts). Without this script loaded,
+            window.google.accounts.oauth2 never exists and every silent
+            refresh attempt fails immediately, forcing a real interactive
+            "Reconnect" popup every ~60 minutes instead. */}
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <Providers>
           <ConditionalHeader />
           {children}

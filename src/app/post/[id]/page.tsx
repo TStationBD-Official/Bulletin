@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Heart, MessageCircle, Share2, ArrowLeft, Flag, User,
-  Bookmark, Lock, Eye, Clock, Calendar, Globe,
+  Bookmark, Lock, Eye, Calendar, Clock, Globe, FileDown,
 } from "lucide-react";
 import {
   getPost, resolveAuthor, isPostLiked, trackView,
-  likePost, unlikePost, savePost, unsavePost, isPostSaved,
+  likePost, unlikePost, savePost, unsavePost, isPostSaved, getRelatedPosts,
 } from "@/lib/firestore";
 import { useStore } from "@/store/useStore";
 import { Post, AuthorProfile } from "@/types";
@@ -18,13 +18,13 @@ import { relativeTime, formatDate, readingTime, extractPlainText, quillImageAlig
 import CommentSection from "@/components/CommentSection";
 import { PostImages } from "@/components/ImageGallery";
 import FileAttachmentList from "@/components/FileAttachmentList";
+import RelatedPostsCarousel from "@/components/RelatedPostsCarousel";
 import ShareModal from "@/components/ShareModal";
 import ReportModal from "@/components/ReportModal";
 import { PageLoader } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 import toast from "react-hot-toast";
 import { QuillDeltaToHtmlConverter } from "quill-delta-to-html";
-import { BentoGrid, BentoTile } from "@/components/BentoGrid";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 import { useActionCooldown } from "@/hooks/useActionCooldown";
 
@@ -44,6 +44,8 @@ export default function PostPage() {
   const [saved,       setSaved]       = useState(false);
   const [showShare,   setShowShare]   = useState(false);
   const [showReport,  setShowReport]  = useState(false);
+  const [relatedPosts,   setRelatedPosts]   = useState<Post[]>([]);
+  const [relatedAuthors, setRelatedAuthors] = useState<Record<string, AuthorProfile | null>>({});
 
   const barRef     = useRef<HTMLDivElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -90,7 +92,8 @@ export default function PostPage() {
               customTagAttributes: quillImageAlignTagAttributes,
             });
             setHtmlContent(converter.convert());
-          } catch {
+          } catch (err) {
+            console.error("Failed to render richContent for post", postId, "— falling back to plain content:", err);
             setHtmlContent(`<p>${p.content}</p>`);
           }
         } else {
@@ -108,6 +111,15 @@ export default function PostPage() {
           trackView(postId, user.uid).catch(() => {});
           isPostSaved(postId, user.uid, userRole).then(setSaved).catch(() => {});
         }
+
+        getRelatedPosts(p.categoryId ?? "general", postId).then(async (related) => {
+          setRelatedPosts(related);
+          const entries: Record<string, AuthorProfile | null> = {};
+          await Promise.all(
+            related.map(async (rp) => { entries[rp.authorId] = await resolveAuthor(rp.authorId).catch(() => null); })
+          );
+          setRelatedAuthors(entries);
+        }).catch(() => {});
       } finally {
         setLoading(false);
       }
@@ -163,8 +175,8 @@ export default function PostPage() {
       <div ref={barRef} className="reading-progress" />
 
       <main className="page min-h-screen bg-white dark:bg-dark-bg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[56px_1fr] xl:grid-cols-[56px_1fr_260px] gap-8 items-start">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[56px_1fr] xl:grid-cols-[56px_1fr_260px] gap-6 sm:gap-8 items-start">
 
             {/* ── Floating left action bar (desktop) ─────── */}
             <div className="hidden lg:flex flex-col items-center gap-4 sticky top-28 pt-24">
@@ -234,6 +246,18 @@ export default function PostPage() {
                   <Flag size={18} />
                 </button>
               )}
+
+              {userRole === "superAdmin" && (
+                <a
+                  href={`/post/${postId}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Download PDF"
+                  className="p-2.5 rounded-full text-gray-400 dark:text-dark-tertiary hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+                >
+                  <FileDown size={20} />
+                </a>
+              )}
             </div>
 
             {/* ── Article ────────────────────────────────── */}
@@ -241,7 +265,7 @@ export default function PostPage() {
               {/* Back */}
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 text-sm text-gray-400 dark:text-dark-tertiary hover:text-gray-700 dark:hover:text-dark-primary transition-colors mb-8"
+                className="inline-flex items-center gap-1.5 text-sm text-gray-400 dark:text-dark-tertiary hover:text-gray-700 dark:hover:text-dark-primary transition-colors mb-5 sm:mb-8"
               >
                 <ArrowLeft size={14} /> Back to feed
               </Link>
@@ -274,52 +298,46 @@ export default function PostPage() {
 
               {/* Title */}
               {post.title && (
-                <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-dark-primary leading-tight tracking-tight mb-6">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 dark:text-dark-primary leading-tight tracking-tight mb-4 sm:mb-6">
                   {post.title}
                 </h1>
               )}
 
               {/* Author + meta row */}
-              <div className="flex items-center gap-3 mb-8 pb-8 border-b border-gray-100 dark:border-dark-border">
+              <div className="flex items-center gap-3.5 mb-6 pb-6 sm:mb-8 sm:pb-8 border-b border-gray-100 dark:border-dark-border">
                 <Link href={`/author/${post.authorId}`} onClick={(e) => e.stopPropagation()}>
                   <motion.div
                     whileHover={{ scale: 1.06 }}
                     transition={{ duration: 0.2 }}
-                    className="w-11 h-11 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0"
+                    className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0 ring-1 ring-gray-100 dark:ring-dark-border"
                   >
                     {author?.profileImageUrl ? (
                       <img src={author.profileImageUrl} alt={author.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-brand-100 dark:bg-brand-900/30">
-                        <User size={18} className="text-brand-500" />
+                        <User size={19} className="text-brand-500" />
                       </div>
                     )}
                   </motion.div>
                 </Link>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0">
                   <Link
                     href={`/author/${post.authorId}`}
-                    className="text-[14px] font-semibold text-gray-900 dark:text-dark-primary hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                    className="text-[15px] font-bold text-gray-900 dark:text-dark-primary hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
                   >
                     {post.authorName}
                   </Link>
-                  <div className="flex items-center gap-3 text-[12px] text-gray-400 dark:text-dark-tertiary mt-0.5 flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={11} /> {formatDate(post.createdAt)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} /> {readMin} min read
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Eye size={11} /> {post.views.toLocaleString()} views
-                    </span>
+                  <div className="flex items-center flex-wrap gap-x-1.5 text-[13px] text-gray-400 dark:text-dark-tertiary mt-0.5">
+                    <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(post.createdAt)}</span>
+                    <span aria-hidden>·</span>
+                    <span className="flex items-center gap-1"><Clock size={12} /> {readMin} min read</span>
                   </div>
                 </div>
               </div>
 
               {/* Featured image (first image if exists) */}
               {post.imageUrls?.[0] && !post.richContent && (
-                <div className="mb-8 -mx-4 sm:-mx-0">
+                <div className="mb-6 sm:mb-8">
                   <img
                     src={post.imageUrls[0]}
                     alt={post.title || "Post image"}
@@ -338,39 +356,42 @@ export default function PostPage() {
               {/* Additional images — only for legacy posts without richContent;
                   when richContent exists, its images are already inline in the article body above */}
               {!post.richContent && post.imageUrls?.length > 1 && (
-                <div className="mt-8">
+                <div className="mt-6 sm:mt-8">
                   <PostImages images={post.imageUrls.slice(1)} />
                 </div>
               )}
 
               {/* File attachments */}
               {post.fileAttachments && post.fileAttachments.length > 0 && (
-                <div className="mt-8">
+                <div className="mt-6 sm:mt-8">
                   <FileAttachmentList files={post.fileAttachments} />
                 </div>
               )}
 
               {/* ── Mobile action bar ─────────────────────── */}
-              <div className="flex items-center gap-2 mt-8 pt-6 border-t border-gray-100 dark:border-dark-border lg:hidden flex-wrap">
+              <div
+                className="grid gap-1 mt-6 sm:mt-8 pt-4 border-t border-gray-100 dark:border-dark-border lg:hidden"
+                style={{ gridTemplateColumns: `repeat(${1 + (allowSharing ? 1 : 0) + (userRole ? 1 : 0) + (user ? 1 : 0) + (userRole === "superAdmin" ? 1 : 0)}, minmax(0, 1fr))` }}
+              >
                 <motion.button
-                  whileTap={{ scale: 1.15 }}
+                  whileTap={{ scale: 1.1 }}
                   onClick={handleLike}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium transition-colors ${
                     liked
                       ? "text-red-500 bg-red-50 dark:bg-red-900/20"
                       : "text-gray-600 dark:text-dark-secondary hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                   }`}
                 >
-                  <Heart size={16} fill={liked ? "currentColor" : "none"} />
+                  <Heart size={17} fill={liked ? "currentColor" : "none"} />
                   {likeCount > 0 ? likeCount : "Like"}
                 </motion.button>
 
                 {allowSharing && (
                   <button
                     onClick={() => setShowShare(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-gray-600 dark:text-dark-secondary hover:bg-gray-100 dark:hover:bg-dark-border transition-colors"
+                    className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium text-gray-600 dark:text-dark-secondary hover:bg-gray-100 dark:hover:bg-dark-border transition-colors"
                   >
-                    <Share2 size={16} /> Share
+                    <Share2 size={17} /> Share
                   </button>
                 )}
 
@@ -378,13 +399,13 @@ export default function PostPage() {
                   <motion.button
                     whileTap={{ scale: 1.1 }}
                     onClick={handleSave}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium transition-colors ${
                       saved
                         ? "bg-brand-500 text-white shadow-sm"
                         : "text-gray-600 dark:text-dark-secondary hover:bg-gray-100 dark:hover:bg-dark-border"
                     }`}
                   >
-                    <Bookmark size={16} fill={saved ? "currentColor" : "none"} />
+                    <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
                     Save
                   </motion.button>
                 )}
@@ -392,76 +413,69 @@ export default function PostPage() {
                 {user && (
                   <button
                     onClick={() => setShowReport(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-gray-400 dark:text-dark-tertiary hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors ml-auto"
+                    className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium text-gray-400 dark:text-dark-tertiary hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
-                    <Flag size={16} /> Report
+                    <Flag size={17} /> Report
                   </button>
+                )}
+
+                {userRole === "superAdmin" && (
+                  <a
+                    href={`/post/${postId}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-medium text-gray-600 dark:text-dark-secondary hover:bg-gray-100 dark:hover:bg-dark-border transition-colors"
+                  >
+                    <FileDown size={17} /> PDF
+                  </a>
                 )}
               </div>
 
-              {/* ── Author card ──────────────────────────── */}
-              {author && (
-                <BentoTile className="mt-10 flex items-start gap-3 sm:gap-4 bg-gray-50/60 dark:bg-dark-card/60 p-4 sm:p-6">
-                  <Link href={`/author/${post.authorId}`}>
-                    <motion.div
-                      whileHover={{ scale: 1.06 }}
-                      transition={{ duration: 0.2 }}
-                      className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-border flex-shrink-0"
-                    >
-                      {author.profileImageUrl ? (
-                        <img src={author.profileImageUrl} alt={author.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-brand-100 dark:bg-brand-900/30">
-                          <User size={22} className="text-brand-500" />
-                        </div>
-                      )}
-                    </motion.div>
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-gray-400 dark:text-dark-tertiary uppercase tracking-widest mb-1">Written by</p>
-                    <Link
-                      href={`/author/${post.authorId}`}
-                      className="text-base font-bold text-gray-900 dark:text-dark-primary hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-                    >
-                      {author.name}
-                    </Link>
-                    {(author as any).bio && (
-                      <p className="text-sm text-gray-500 dark:text-dark-tertiary mt-1 leading-relaxed line-clamp-3">{(author as any).bio}</p>
-                    )}
-                  </div>
-                </BentoTile>
+              {/* ── Related posts (below the article on mobile/tablet/lg;
+                  moves into the sidebar below Story stats at xl — see below) ── */}
+              {relatedPosts.length > 0 && (
+                <div className="mt-8 sm:mt-10 xl:hidden">
+                  <RelatedPostsCarousel posts={relatedPosts} authors={relatedAuthors} />
+                </div>
               )}
 
               {/* ── Comments ─────────────────────────────── */}
-              <div id="comments" className="mt-12">
+              <div id="comments" className="mt-8 sm:mt-12">
                 <CommentSection postId={postId} />
               </div>
             </article>
 
             {/* ── Right sidebar (xl only) ─────────────── */}
             <div className="hidden xl:block sticky top-28">
-              <BentoGrid cols="grid-cols-2" className="gap-3">
-                {[
-                  { icon: <Heart size={14} />, label: "Likes", value: likeCount },
-                  { icon: <MessageCircle size={14} />, label: "Comments", value: post.comments },
-                  { icon: <Eye size={14} />, label: "Views", value: post.views },
-                  { icon: <Share2 size={14} />, label: "Shares", value: post.shares },
-                ].map(({ icon, label, value }) => (
-                  <BentoTile key={label} className="flex flex-col items-center justify-center text-center gap-1.5 p-4">
-                    <div className="text-gray-400 dark:text-dark-tertiary">{icon}</div>
-                    <span className="text-lg font-bold text-gray-900 dark:text-dark-primary">{value.toLocaleString()}</span>
-                    <span className="text-[11px] text-gray-400 dark:text-dark-tertiary">{label}</span>
-                  </BentoTile>
-                ))}
-                <BentoTile bare colSpan="col-span-2" className="text-[12px] text-gray-400 dark:text-dark-tertiary space-y-1.5 px-1">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={12} /> Published {formatDate(post.createdAt)}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock size={12} /> {readMin} min read
-                  </div>
-                </BentoTile>
-              </BentoGrid>
+              <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border overflow-hidden">
+                <p className="text-[11px] font-bold text-gray-400 dark:text-dark-tertiary uppercase tracking-widest px-5 pt-4 pb-2">
+                  Story stats
+                </p>
+                <div className="divide-y divide-gray-100 dark:divide-dark-border">
+                  {[
+                    { icon: <Heart size={14} />, label: "Likes", value: likeCount },
+                    { icon: <MessageCircle size={14} />, label: "Comments", value: post.comments },
+                    { icon: <Eye size={14} />, label: "Views", value: post.views },
+                    { icon: <Share2 size={14} />, label: "Shares", value: post.shares },
+                  ].map(({ icon, label, value }) => (
+                    <div key={label} className="flex items-center justify-between px-5 py-3">
+                      <span className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-dark-tertiary">
+                        {icon} {label}
+                      </span>
+                      <span className="text-[13px] font-bold text-gray-900 dark:text-dark-primary tabular-nums">
+                        {value.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Related posts — desktop position, below Story stats */}
+              {relatedPosts.length > 0 && (
+                <div className="mt-6">
+                  <RelatedPostsCarousel posts={relatedPosts} authors={relatedAuthors} />
+                </div>
+              )}
             </div>
           </div>
         </div>

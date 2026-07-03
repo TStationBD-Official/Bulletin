@@ -23,6 +23,8 @@ import { Users, ArrowRight, User } from "lucide-react";
 import { relativeTime } from "@/lib/utils";
 import { BentoGrid, BentoTile } from "@/components/BentoGrid";
 import TrendingBox from "@/components/TrendingBox";
+import TrendingCarousel from "@/components/TrendingCarousel";
+import TopAuthorsCarousel from "@/components/TopAuthorsCarousel";
 import Footer from "@/components/Footer";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 
@@ -189,38 +191,66 @@ function FeedPageInner() {
 
       {/* ── TuitionCore promo banner ──────────────────────────── */}
       <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4">
-        <div ref={bannerRef} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 shadow-lg shadow-brand-500/20 px-4 py-4 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-center gap-3 sm:gap-6">
+        <div ref={bannerRef} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 shadow-lg shadow-brand-500/20">
           <div ref={circleTopRef} className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
           <div ref={circleBottomRef} className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
 
-          <div className="relative flex-1 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left">
-            <img
-              src="/tuitioncore.png"
-              alt="TuitionCore"
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover flex-shrink-0 ring-2 ring-white/30 bg-white/10"
-            />
-            <div>
-              <span className="inline-block text-[10px] sm:text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">
-                Powered by TuitionCore
-              </span>
-              <h2 className="text-base sm:text-xl font-bold text-white leading-snug">
-                Bulletin runs on TuitionCore — a complete system to manage students
-              </h2>
-              <p className="text-[13px] sm:text-sm text-white/80 mt-1">
-                Attendance, performance, fees and communication, all in one place for tutors and admins.
-              </p>
-            </div>
-          </div>
-
+          {/* Mobile: minimal strip, with one extra line explaining what TuitionCore is */}
           <a
             href="https://tuitioncore.vercel.app/"
             target="_blank"
             rel="noopener noreferrer"
-            className="relative w-full sm:w-auto flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white text-brand-700 text-sm font-bold rounded-xl hover:bg-brand-50 active:scale-95 transition-all shadow-sm"
+            className="sm:hidden relative flex items-center gap-2.5 px-3.5 py-2.5"
           >
-            Know more
-            <ArrowRight size={15} />
+            <img
+              src="/tuitioncore.png"
+              alt="TuitionCore"
+              className="w-8 h-8 rounded-md object-cover flex-shrink-0 ring-1 ring-white/30 bg-white/10"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-[11px] font-bold text-white">
+                Powered by TuitionCore
+              </p>
+              <p className="truncate text-[10.5px] text-white/75 mt-0.5">
+                Student attendance, fees & performance management
+              </p>
+            </div>
+            <span className="flex-shrink-0 inline-flex items-center gap-0.5 text-[11px] font-bold text-white">
+              Know more <ArrowRight size={11} />
+            </span>
           </a>
+
+          {/* Desktop/tablet: full rich version */}
+          <div className="hidden sm:flex relative px-8 py-6 items-center gap-6">
+            <div className="relative flex-1 flex items-center gap-4 text-left">
+              <img
+                src="/tuitioncore.png"
+                alt="TuitionCore"
+                className="w-14 h-14 rounded-xl object-cover flex-shrink-0 ring-2 ring-white/30 bg-white/10"
+              />
+              <div>
+                <span className="inline-block text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">
+                  Powered by TuitionCore
+                </span>
+                <h2 className="text-xl font-bold text-white leading-snug">
+                  Bulletin runs on TuitionCore — a complete system to manage students
+                </h2>
+                <p className="text-sm text-white/80 mt-1">
+                  Attendance, performance, fees and communication, all in one place for tutors and admins.
+                </p>
+              </div>
+            </div>
+
+            <a
+              href="https://tuitioncore.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white text-brand-700 text-sm font-bold rounded-xl hover:bg-brand-50 active:scale-95 transition-all shadow-sm"
+            >
+              Know more
+              <ArrowRight size={15} />
+            </a>
+          </div>
         </div>
       </div>
 
@@ -266,6 +296,19 @@ function FeedPageInner() {
 
             {/* ── Feed ──────────────────────────────────────────── */}
             <div ref={feedColumnRef} className="py-6">
+
+              {/* Trending + Top Authors — auto-sliding carousels on mobile only;
+                  the desktop sidebar (hidden below lg) shows the same data as lists */}
+              {weeklyTrending.length > 0 && (
+                <div className="mb-4">
+                  <TrendingCarousel title="Weekly Trending" posts={weeklyTrending} />
+                </div>
+              )}
+              {topAuthors.length > 0 && (
+                <div className="mb-6">
+                  <TopAuthorsCarousel authors={topAuthors} />
+                </div>
+              )}
 
               {/* Search banner */}
               {query && (

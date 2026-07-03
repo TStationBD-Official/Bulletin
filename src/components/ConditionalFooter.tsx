@@ -5,8 +5,8 @@ import Footer from "./Footer";
 
 export default function ConditionalFooter() {
   const pathname = usePathname();
-  // No footer on admin pages or compose
-  if (pathname.startsWith("/admin") || pathname === "/compose" || pathname === "/approve") return null;
+  // No footer on admin pages, compose, or the PDF export view
+  if (pathname.startsWith("/admin") || pathname === "/compose" || pathname === "/approve" || pathname.endsWith("/pdf")) return null;
 
   // Home feed uses a fixed-height app-shell layout on lg+ (the feed scrolls
   // independently inside <main>) — a footer placed here, outside that scroll
