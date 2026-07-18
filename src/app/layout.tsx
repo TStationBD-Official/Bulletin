@@ -59,6 +59,14 @@ export default function RootLayout({
             refresh attempt fails immediately, forcing a real interactive
             "Reconnect" popup every ~60 minutes instead. */}
         <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
+        {/* Yandex Ads Autoplacement 19611424 */}
+        <Script src="https://yandex.ru/ads/system/context.js" strategy="afterInteractive" async />
+        <Script
+          data-page-id="19611424"
+          src="https://yandex.ru/ads/system/ap-loader.js"
+          strategy="afterInteractive"
+          async
+        />
         <Providers>
           <ConditionalHeader />
           {children}
