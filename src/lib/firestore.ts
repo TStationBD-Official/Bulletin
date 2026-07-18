@@ -107,6 +107,19 @@ export function subscribeToLatestPosts(
     orderBy("createdAt", "desc"),
     limit(pageSize)
   );
+  // onSnapshot establishes a persistent listen channel before its first
+  // result arrives, which is slower to first-paint than a plain one-shot
+  // fetch. Race a getDocs() call so the feed can paint immediately; onSnapshot
+  // still takes over for live updates once it catches up.
+  getDocs(publicQuery)
+    .then((snap) => {
+      if (publicPosts.length === 0) {
+        publicPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
+        emit();
+      }
+    })
+    .catch(() => {});
+
   const unsubPublic = onSnapshot(publicQuery, (snap) => {
     publicPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
     emit();
