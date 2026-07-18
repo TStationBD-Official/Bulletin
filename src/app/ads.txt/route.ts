@@ -1,0 +1,17 @@
+const ADS_TXT = `yandex.com, 328360585, DIRECT
+google.com, pub-5533854580432370, RESELLER, f08c47fec0942fa0
+improvedigital.com, 2031, RESELLER
+uis.mobfox.com, 165, RESELLER
+hyperad.tech, 215, RESELLER
+betweendigital.com, 43554, RESELLER
+Contextweb.com, 562899, RESELLER, 89ff185a4c4e857c
+hyperad.tech, 150, RESELLER
+`;
+
+export function GET() {
+  return new Response(ADS_TXT, {
+    headers: {
+      "Content-Type": "text/plain",
+    },
+  });
+}
