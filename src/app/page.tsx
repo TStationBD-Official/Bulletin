@@ -25,6 +25,7 @@ import { BentoGrid, BentoTile } from "@/components/BentoGrid";
 import TrendingBox from "@/components/TrendingBox";
 import TrendingCarousel from "@/components/TrendingCarousel";
 import TopAuthorsCarousel from "@/components/TopAuthorsCarousel";
+import AdsterraNativeBanner from "@/components/ads/AdsterraNativeBanner";
 import Footer from "@/components/Footer";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 
@@ -332,6 +333,7 @@ function FeedPageInner() {
                 />
               ) : (
                 <div>
+                  <AdsterraNativeBanner />
                   {filteredPosts.map((post, i) => (
                     <PostCard
                       key={post.id}

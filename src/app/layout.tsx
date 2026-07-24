@@ -50,7 +50,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Monetag multitag (verified) */}
         <script src="https://quge5.com/88/tag.min.js" data-zone="263152" async data-cfasync="false"></script>
+        {/* Adsterra Popunder — must stay right before </head>, one per page per Adsterra's guidance */}
+        <script src="https://pl30509826.effectivecpmnetwork.com/b9/61/59/b96159b813a6345c50f192c2d7b48a52.js"></script>
         <ThemeInitializer />
       </head>
       <body className={`${inter.className} bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-primary antialiased transition-colors`}>
@@ -67,6 +70,11 @@ export default function RootLayout({
           src="https://yandex.ru/ads/system/ap-loader.js"
           strategy="afterInteractive"
           async
+        />
+        {/* Adsterra Social Bar — self-positioning floating widget, loaded once site-wide */}
+        <Script
+          src="https://pl30509829.effectivecpmnetwork.com/04/9e/9d/049e9d975be3d4b685a9c5ea30d32cdd.js"
+          strategy="afterInteractive"
         />
         <Providers>
           <ConditionalHeader />

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useStore } from "@/store/useStore";
 import Logo from "./Logo";
+import AdsterraBanner from "./ads/AdsterraBanner";
 
 export default function Footer() {
   const { settings } = useStore();
@@ -11,10 +12,10 @@ export default function Footer() {
   const siteTitle   = settings?.siteTitle ?? "The Net Chronicle";
 
   const policies = [
-    { href: "/terms",      label: "Terms",      content: settings?.termsOfService      },
-    { href: "/privacy",    label: "Privacy",    content: settings?.privacyPolicy       },
-    { href: "/guidelines", label: "Guidelines", content: settings?.communityGuidelines },
-  ].filter((p) => !!p.content?.trim());
+    { href: "/terms",      label: "Terms"      },
+    { href: "/privacy",    label: "Privacy"    },
+    { href: "/guidelines", label: "Guidelines" },
+  ];
 
   return (
     <motion.footer
@@ -25,6 +26,7 @@ export default function Footer() {
       className="border-t border-gray-100 dark:border-dark-border bg-white dark:bg-dark-bg mt-16"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+        <AdsterraBanner />
         <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:justify-between gap-3 sm:gap-6">
           {/* Brand */}
           <div className="flex flex-col items-center sm:items-start gap-1.5 sm:gap-2">
