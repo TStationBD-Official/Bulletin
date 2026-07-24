@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Users, Search } from "lucide-react";
-import { getAllUsersWithStats, UnifiedUser } from "@/lib/firestore";
+import { getAllUsersWithStats } from "@/lib/firestore";
 import { PageLoader } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 import AllUsersTable from "@/components/admin/AllUsersTable";
@@ -26,22 +27,19 @@ const STATUS_OPTIONS = [
 ];
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UnifiedUser[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const all = await getAllUsersWithStats();
-        setUsers(all);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  // Cached — this reads every user + every post, so re-fetching on every
+  // navigation into this page (previously a plain useEffect) was re-paying
+  // that full cost each visit. 2 min staleTime keeps it snappy for an admin
+  // clicking around without going stale for the whole session.
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: ["admin", "allUsersWithStats"],
+    queryFn: getAllUsersWithStats,
+    staleTime: 2 * 60 * 1000,
+  });
 
   const filtered = users.filter((u) => {
     const q = searchQuery.toLowerCase();

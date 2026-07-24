@@ -1098,9 +1098,11 @@ export async function getAllUsersWithStats(): Promise<UnifiedUser[]> {
     { col: "feeds_user_only", role: "feeds_user" },
   ];
 
-  // Fetch all role collections + all posts in parallel
+  // Fetch all role collections + all posts in parallel. The posts query has
+  // a high safety ceiling — not a behavior change at current scale, just a
+  // guardrail so a runaway posts collection can't blow this up unbounded.
   const [postsSnap, ...roleSnaps] = await Promise.all([
-    getDocs(query(collection(db, "posts"), where("status", "!=", "deleted"))),
+    getDocs(query(collection(db, "posts"), where("status", "!=", "deleted"), limit(20000))),
     ...roleSources.map(({ col }) => getDocs(collection(db, col))),
   ]);
 
