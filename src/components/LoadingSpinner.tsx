@@ -82,7 +82,7 @@ export function PageLoader() {
       {/* Brand wordmark */}
       <div className="flex flex-col items-center gap-1">
         <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-brand-600 to-indigo-500 bg-clip-text text-transparent">
-          Bulletin
+          The Net Chronicle
         </span>
         <span className="text-[11px] font-medium tracking-widest uppercase text-gray-400 dark:text-dark-muted">
           Loading

@@ -8,7 +8,7 @@ import Logo from "./Logo";
 export default function Footer() {
   const { settings } = useStore();
   const description = settings?.siteDescription ?? "Share and discuss educational content";
-  const siteTitle   = settings?.siteTitle ?? "Bulletin";
+  const siteTitle   = settings?.siteTitle ?? "The Net Chronicle";
 
   const policies = [
     { href: "/terms",      label: "Terms",      content: settings?.termsOfService      },

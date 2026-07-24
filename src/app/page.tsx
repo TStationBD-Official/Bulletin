@@ -233,7 +233,7 @@ function FeedPageInner() {
                   Powered by TuitionCore
                 </span>
                 <h2 className="text-xl font-bold text-white leading-snug">
-                  Bulletin runs on TuitionCore — a complete system to manage students
+                  The Net Chronicle runs on TuitionCore — a complete system to manage students
                 </h2>
                 <p className="text-sm text-white/80 mt-1">
                   Attendance, performance, fees and communication, all in one place for tutors and admins.
@@ -420,7 +420,7 @@ function FeedPageInner() {
                   <div className="relative">
                     <h4 className="font-bold text-white text-sm mb-1">Share your knowledge</h4>
                     <p className="text-[12px] text-white/70 mb-4 leading-relaxed">
-                      Write for the Bulletin community and reach thousands of readers.
+                      Write for The Net Chronicle community and reach thousands of readers.
                     </p>
                     <Link
                       href="/compose"

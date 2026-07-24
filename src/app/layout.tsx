@@ -9,16 +9,16 @@ import ConditionalFooter from "@/components/ConditionalFooter";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Bulletin | Share & Discuss",
+  title: "The Net Chronicle | Share & Discuss",
   description:
-    "Bulletin — a social blogging platform for education. Share posts, engage with the community, and discuss educational topics.",
+    "The Net Chronicle — a social blogging platform for education. Share posts, engage with the community, and discuss educational topics.",
   keywords: [
     "education",
     "blog",
     "community",
     "tutoring",
     "learning",
-    "bulletin",
+    "the net chronicle",
   ],
 };
 
@@ -50,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script src="https://quge5.com/88/tag.min.js" data-zone="263152" async data-cfasync="false"></script>
         <ThemeInitializer />
       </head>
       <body className={`${inter.className} bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-primary antialiased transition-colors`}>

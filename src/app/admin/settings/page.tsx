@@ -21,7 +21,7 @@ const defaultSettings: AppSettings = {
   allowNewSignups: true,
   requireEmailVerification: false,
   autoApproveAdminPosts: true,
-  siteTitle: "Bulletin",
+  siteTitle: "The Net Chronicle",
   siteDescription: "Share and discuss educational content",
   logoUrl: "",
   primaryColor: "#3b82f6",

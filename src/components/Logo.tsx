@@ -12,7 +12,7 @@ interface LogoProps {
 export default function Logo({ size = 32, showName = true, className = "" }: LogoProps) {
   const { settings } = useStore();
   const logoUrl   = settings?.logoUrl?.trim() || "";
-  const siteTitle = settings?.siteTitle || "Bulletin";
+  const siteTitle = settings?.siteTitle || "The Net Chronicle";
 
   const [imgError, setImgError] = useState(false);
 

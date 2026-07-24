@@ -247,7 +247,7 @@ export default function PostPdfPage() {
 
         {/* ── Footer ──────────────────────────────────────────── */}
         <div className="mt-12 pt-5 border-t border-gray-200 flex items-center justify-between text-[11px] text-gray-400">
-          <span>Exported from Bulletin · {formatDate(new Date())}</span>
+          <span>Exported from The Net Chronicle · {formatDate(new Date())}</span>
           <span>{TUITIONCORE_URL}</span>
         </div>
       </div>

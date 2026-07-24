@@ -13,7 +13,7 @@ interface PolicyPageProps {
 export default function PolicyPage({ field, title, icon }: PolicyPageProps) {
   const { settings } = useStore();
   const content = settings?.[field] ?? "";
-  const siteTitle = settings?.siteTitle ?? "Bulletin";
+  const siteTitle = settings?.siteTitle ?? "The Net Chronicle";
 
   return (
     <main className="page min-h-screen bg-gray-50 dark:bg-dark-bg">
