@@ -34,8 +34,8 @@ export default function RelatedPostsCarousel({ posts, authors, interval = 5000 }
     <div className="rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-card p-4 sm:p-5 overflow-hidden">
       <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-brand-100 to-indigo-100 dark:from-brand-900/30 dark:to-indigo-900/30 flex items-center justify-center">
-            <Sparkles size={13} className="text-brand-500" />
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center">
+            <Sparkles size={13} className="text-violet-500" />
           </div>
           <h3 className="text-xs font-bold text-gray-900 dark:text-dark-primary uppercase tracking-widest">
             Related Posts

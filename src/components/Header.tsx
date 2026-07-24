@@ -508,21 +508,14 @@ export default function Header() {
               </div>
 
               <div className="bg-gray-50 dark:bg-dark-bg/60 rounded-xl p-4 text-sm text-gray-600 dark:text-dark-secondary space-y-2 border border-gray-100 dark:border-dark-border/60">
-                {settings?.termsOfService?.trim() && (
-                  <div className="flex items-center gap-2">
-                    <span>📄</span>
-                    <Link href="/terms" target="_blank" className="hover:text-brand-500 underline underline-offset-2 transition-colors">Terms of Service</Link>
-                  </div>
-                )}
-                {settings?.privacyPolicy?.trim() && (
-                  <div className="flex items-center gap-2">
-                    <span>🔒</span>
-                    <Link href="/privacy" target="_blank" className="hover:text-brand-500 underline underline-offset-2 transition-colors">Privacy Policy</Link>
-                  </div>
-                )}
-                {!settings?.termsOfService?.trim() && !settings?.privacyPolicy?.trim() && (
-                  <p className="text-gray-400 dark:text-dark-tertiary text-xs">By signing in you agree to use this platform responsibly.</p>
-                )}
+                <div className="flex items-center gap-2">
+                  <span>📄</span>
+                  <Link href="/terms" target="_blank" className="hover:text-brand-500 underline underline-offset-2 transition-colors">Terms of Service</Link>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>🔒</span>
+                  <Link href="/privacy" target="_blank" className="hover:text-brand-500 underline underline-offset-2 transition-colors">Privacy Policy</Link>
+                </div>
               </div>
 
               <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -534,14 +527,9 @@ export default function Header() {
                 />
                 <span className="text-sm text-gray-700 dark:text-dark-secondary">
                   I have read and agree to the{" "}
-                  {settings?.termsOfService?.trim() && (
-                    <Link href="/terms" target="_blank" className="text-brand-500 hover:underline">Terms of Service</Link>
-                  )}
-                  {settings?.termsOfService?.trim() && settings?.privacyPolicy?.trim() && " and "}
-                  {settings?.privacyPolicy?.trim() && (
-                    <Link href="/privacy" target="_blank" className="text-brand-500 hover:underline">Privacy Policy</Link>
-                  )}
-                  {!settings?.termsOfService?.trim() && !settings?.privacyPolicy?.trim() && "platform guidelines"}
+                  <Link href="/terms" target="_blank" className="text-brand-500 hover:underline">Terms of Service</Link>
+                  {" and "}
+                  <Link href="/privacy" target="_blank" className="text-brand-500 hover:underline">Privacy Policy</Link>
                 </span>
               </label>
 

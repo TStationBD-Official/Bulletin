@@ -47,6 +47,11 @@ interface BentoTileProps {
   as?: "div" | "article";
   onClick?: () => void;
   style?: CSSProperties;
+  /** Skip the stagger-in-from-parent-viewport animation — for tiles that can
+      mount well after the BentoGrid's own whileInView has already fired
+      (e.g. content that arrives from a slower async fetch), which would
+      otherwise leave them stuck at the animation's hidden (opacity: 0) state. */
+  noAnimate?: boolean;
 }
 
 export function BentoTile({
@@ -58,11 +63,13 @@ export function BentoTile({
   as = "div",
   onClick,
   style,
+  noAnimate = false,
 }: BentoTileProps) {
   const Comp = as === "article" ? motion.article : motion.div;
   return (
     <Comp
       variants={tileVariants}
+      initial={noAnimate ? false : undefined}
       onClick={onClick}
       style={style}
       className={cn(

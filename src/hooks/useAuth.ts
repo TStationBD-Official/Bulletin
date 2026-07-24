@@ -70,14 +70,21 @@ export function useAuth() {
         (async () => {
           try {
             const fresh = await getValidDriveToken(uid);
-            if (fresh) useStore.getState().setAccessToken(fresh);
+            // fresh is null only when a stored token existed but was expired
+            // and the silent refresh genuinely failed (revoked access, no
+            // Google session, third-party cookies blocked, etc.) — reflect
+            // that honestly instead of leaving the stale token in the store,
+            // which would show a "Drive connected" badge that's actually dead.
+            useStore.getState().setAccessToken(fresh);
           } catch {
             // GIS not loaded yet — retry after 3 s
             setTimeout(async () => {
               try {
                 const fresh = await silentRefreshDriveToken(uid);
-                if (fresh) useStore.getState().setAccessToken(fresh);
-              } catch {}
+                useStore.getState().setAccessToken(fresh);
+              } catch {
+                useStore.getState().setAccessToken(null);
+              }
             }, 3000);
           }
         })();
@@ -92,7 +99,11 @@ export function useAuth() {
               const fresh = await silentRefreshDriveToken(uid);
               useStore.getState().setAccessToken(fresh);
             } catch {
-              // User may have revoked access — clear interval and let them reconnect manually
+              // User may have revoked access, signed out of Google elsewhere, or
+              // the browser is blocking the silent flow (third-party cookies) —
+              // reflect the real state so the UI shows "disconnected" and offers
+              // Reconnect, instead of a stale green badge that fails on next upload.
+              useStore.getState().setAccessToken(null);
               clearInterval(refreshInterval);
             }
           }

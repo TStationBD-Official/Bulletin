@@ -5,15 +5,17 @@ import { ArrowLeft } from "lucide-react";
 import { useStore } from "@/store/useStore";
 
 interface PolicyPageProps {
-  field: "termsOfService" | "privacyPolicy" | "communityGuidelines";
+  content: string;
   title: string;
   icon: string;
 }
 
-export default function PolicyPage({ field, title, icon }: PolicyPageProps) {
+// Hardcoded rather than read from app_settings/feeds_website — this content
+// changes rarely, so baking it into the bundle avoids a Firestore read on
+// every visit to these three pages.
+export default function PolicyPage({ content, title, icon }: PolicyPageProps) {
   const { settings } = useStore();
-  const content = settings?.[field] ?? "";
-  const siteTitle = settings?.siteTitle ?? "The Net Chronicle";
+  const siteTitle = settings?.siteTitle || "The Net Chronicle";
 
   return (
     <main className="page min-h-screen bg-gray-50 dark:bg-dark-bg">

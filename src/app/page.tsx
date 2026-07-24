@@ -245,7 +245,7 @@ function FeedPageInner() {
               href="https://tuitioncore.vercel.app/"
               target="_blank"
               rel="noopener noreferrer"
-              className="relative flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white text-brand-700 text-sm font-bold rounded-xl hover:bg-brand-50 active:scale-95 transition-all shadow-sm"
+              className="relative flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-[#ffffff] text-brand-700 text-sm font-bold rounded-xl hover:bg-brand-50 active:scale-95 transition-all shadow-sm"
             >
               Know more
               <ArrowRight size={15} />
@@ -373,10 +373,10 @@ function FeedPageInner() {
 
                 {/* Top Authors */}
                 {topAuthors.length > 0 && (
-                  <BentoTile className="p-5">
+                  <BentoTile className="p-5" noAnimate>
                     <div className="flex items-center gap-2 mb-5">
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-brand-100 to-indigo-100 dark:from-brand-900/30 dark:to-indigo-900/30 flex items-center justify-center">
-                        <Users size={13} className="text-brand-500" />
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                        <Users size={13} className="text-indigo-500" />
                       </div>
                       <h3 className="text-xs font-bold text-gray-900 dark:text-dark-primary uppercase tracking-widest">
                         Top Authors
@@ -424,7 +424,7 @@ function FeedPageInner() {
                     </p>
                     <Link
                       href="/compose"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-brand-700 text-[12px] font-bold rounded-xl hover:bg-brand-50 transition-colors shadow-sm"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#ffffff] text-brand-700 text-[12px] font-bold rounded-xl hover:bg-brand-50 transition-colors shadow-sm"
                     >
                       Start writing
                       <ArrowRight size={12} />

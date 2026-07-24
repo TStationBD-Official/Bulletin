@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -476,16 +477,14 @@ export async function trackView(postId: string, userId: string) {
 }
 
 export async function sharePost(postId: string, userId: string) {
-  const shareId = `${userId}_${Date.now()}`;
-  await Promise.all([
-    setDoc(doc(db, "posts", postId, "shares", shareId), {
-      sharedAt: serverTimestamp(),
-    }),
-    updateDoc(doc(db, "posts", postId), { shares: increment(1) }),
-  ]);
+  const shareRef = doc(db, "posts", postId, "shares", userId);
+  await runTransaction(db, async (tx) => {
+    const existing = await tx.get(shareRef);
+    if (existing.exists()) return;
+    tx.set(shareRef, { userId, sharedAt: serverTimestamp() });
+    tx.update(doc(db, "posts", postId), { shares: increment(1) });
+  });
 }
-
-import { setDoc } from "firebase/firestore";
 
 // ─── Saved Posts ──────────────────────────────────────────────────────────────
 // feeds_user accounts keep using feeds_user_only.savedPosts (existing data,

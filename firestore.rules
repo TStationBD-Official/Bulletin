@@ -78,9 +78,9 @@ service cloud.firestore {
       }
 
       // Shares
-      match /shares/{shareId} {
+      match /shares/{userId} {
         allow read: if isAuthenticated() && isSuperAdmin(request.auth.uid);
-        allow write: if isAuthenticated();
+        allow write: if isAuthenticated() && request.auth.uid == userId;
       }
     }
 

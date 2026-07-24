@@ -32,8 +32,8 @@ export default function TopAuthorsCarousel({ authors, interval = 4500 }: TopAuth
     <div className="lg:hidden bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border shadow-card p-4 overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-brand-100 to-indigo-100 dark:from-brand-900/30 dark:to-indigo-900/30 flex items-center justify-center">
-            <Users size={13} className="text-brand-500" />
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center">
+            <Users size={13} className="text-indigo-500" />
           </div>
           <h3 className="text-xs font-bold text-gray-900 dark:text-dark-primary uppercase tracking-widest">
             Top Authors

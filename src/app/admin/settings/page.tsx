@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Settings, Shield, Share2, Users, Clock,
-  Palette, FileText, AlertTriangle, X, Plus, Save, Upload, Trash2,
+  Palette, AlertTriangle, X, Plus, Save, Upload, Trash2,
 } from "lucide-react";
 import { getSettings, updateSettings } from "@/lib/firestore";
 import { uploadToDrive } from "@/lib/drive";
@@ -376,27 +376,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-          </Section>
-
-          {/* Policies */}
-          <Section title="Policies & Guidelines" icon={FileText} delay={0.25}>
-            <p className="text-xs text-gray-500 dark:text-dark-tertiary -mt-2">These are shown to users on the relevant policy pages.</p>
-            {[
-              { key: "termsOfService",       label: "Terms of Service"       },
-              { key: "privacyPolicy",         label: "Privacy Policy"         },
-              { key: "communityGuidelines",   label: "Community Guidelines"   },
-            ].map(({ key, label }) => (
-              <div key={key}>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-dark-tertiary mb-1">{label}</label>
-                <textarea
-                  value={(settings as any)[key]}
-                  onChange={(e) => update({ [key]: e.target.value } as any)}
-                  rows={5}
-                  placeholder={`Enter ${label}…`}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-transparent text-gray-800 dark:text-dark-primary resize-y placeholder:text-gray-400"
-                />
-              </div>
-            ))}
           </Section>
 
           {/* Floating save button at bottom */}
