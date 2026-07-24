@@ -90,7 +90,10 @@ export function useAuth() {
         })();
 
         setUser(firebaseUser, role, resolvedData, accessToken);
-        updateLastLogin(firebaseUser.uid, role);
+        updateLastLogin(firebaseUser.uid, role, {
+          name: resolvedData.name,
+          profileImageUrl: resolvedData.profileImageUrl ?? firebaseUser.photoURL,
+        });
 
         // Auto-refresh Drive token every 50 minutes in the background
         const refreshInterval = setInterval(async () => {

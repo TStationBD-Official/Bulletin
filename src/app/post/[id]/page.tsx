@@ -23,6 +23,8 @@ import ShareModal from "@/components/ShareModal";
 import ReportModal from "@/components/ReportModal";
 import { PageLoader } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
+import AdsterraBanner from "@/components/ads/AdsterraBanner";
+import AdsterraNativeBanner from "@/components/ads/AdsterraNativeBanner";
 import toast from "react-hot-toast";
 import { QuillDeltaToHtmlConverter } from "quill-delta-to-html";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
@@ -335,6 +337,9 @@ export default function PostPage() {
                 </div>
               </div>
 
+              {/* In-content banner — natural gap between the author row and the article body */}
+              <AdsterraBanner />
+
               {/* Featured image (first image if exists) */}
               {post.imageUrls?.[0] && !post.richContent && (
                 <div className="mb-6 sm:mb-8">
@@ -367,6 +372,13 @@ export default function PostPage() {
                   <FileAttachmentList files={post.fileAttachments} />
                 </div>
               )}
+
+              {/* In-content native banner — gap after the article body, before the action bar/comments;
+                  fluid width so it shows on mobile/tablet/lg. Hidden at xl since the sidebar shows
+                  its own instance there instead — the ad unit's container id must be unique per page. */}
+              <div className="mt-6 sm:mt-8 xl:hidden">
+                <AdsterraNativeBanner />
+              </div>
 
               {/* ── Mobile action bar ─────────────────────── */}
               <div
@@ -476,6 +488,11 @@ export default function PostPage() {
                   <RelatedPostsCarousel posts={relatedPosts} authors={relatedAuthors} />
                 </div>
               )}
+
+              {/* Sidebar native banner — fills the remaining gap below the sidebar content */}
+              <div className="mt-6">
+                <AdsterraNativeBanner />
+              </div>
             </div>
           </div>
         </div>

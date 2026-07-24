@@ -48,6 +48,25 @@ const authorCache = new Map<string, AuthorProfile>();
 export async function resolveAuthor(authorId: string): Promise<AuthorProfile | null> {
   if (authorCache.has(authorId)) return authorCache.get(authorId)!;
 
+  // Fast path: author_profiles is a single lightweight doc per user
+  // (uid/role/name/profileImageUrl), kept up to date on every login — one
+  // read instead of probing up to 5 role collections in sequence below.
+  // Falls through to the full scan for accounts that haven't logged in
+  // since this index was introduced (self-heals on their next login).
+  const fastSnap = await getDoc(doc(db, "author_profiles", authorId));
+  if (fastSnap.exists()) {
+    const data = fastSnap.data();
+    const profile: AuthorProfile = {
+      id: authorId,
+      name: data.name ?? "Unknown",
+      email: "",
+      profileImageUrl: data.profileImageUrl ?? null,
+      role: data.role ?? "feeds_user",
+    };
+    authorCache.set(authorId, profile);
+    return profile;
+  }
+
   const collections: Array<{ name: string; role: UserRole }> = [
     { name: "super_admins", role: "superAdmin" },
     { name: "admins", role: "admin" },
@@ -108,19 +127,11 @@ export function subscribeToLatestPosts(
     orderBy("createdAt", "desc"),
     limit(pageSize)
   );
-  // onSnapshot establishes a persistent listen channel before its first
-  // result arrives, which is slower to first-paint than a plain one-shot
-  // fetch. Race a getDocs() call so the feed can paint immediately; onSnapshot
-  // still takes over for live updates once it catches up.
-  getDocs(publicQuery)
-    .then((snap) => {
-      if (publicPosts.length === 0) {
-        publicPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
-        emit();
-      }
-    })
-    .catch(() => {});
-
+  // Previously this raced a one-off getDocs() alongside the onSnapshot
+  // listener below to paint faster — but Firestore bills the onSnapshot's
+  // own initial snapshot as a full read too, so that "faster paint" was
+  // silently doubling the read cost of every feed page load. onSnapshot's
+  // first callback is fast enough on its own; no need to pre-fetch.
   const unsubPublic = onSnapshot(publicQuery, (snap) => {
     publicPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
     emit();

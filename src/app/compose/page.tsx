@@ -20,6 +20,7 @@ import { useStore } from "@/store/useStore";
 import { reconnectDrive, getValidDriveToken } from "@/lib/driveAuth";
 import EmptyState from "@/components/EmptyState";
 import { PageLoader } from "@/components/LoadingSpinner";
+import AdsterraNativeBanner from "@/components/ads/AdsterraNativeBanner";
 import toast from "react-hot-toast";
 
 const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
@@ -549,6 +550,11 @@ function ComposePageInner() {
                     )}
                   </AnimatePresence>
                 </div>
+              </div>
+
+              {/* In-content native ad — natural gap below the editor, shown on every breakpoint since this column isn't lg:hidden */}
+              <div className="mt-8">
+                <AdsterraNativeBanner />
               </div>
 
               {/* ── Mobile: Settings toggle ──────────────────────── */}

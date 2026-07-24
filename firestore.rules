@@ -124,6 +124,11 @@ service cloud.firestore {
     }
 
     // ===== USERS_METADATA =====
+    // NOT broadly readable — besides role/selectedRole this also holds
+    // savedPosts + email for admin/student/guardian/superAdmin accounts
+    // (see savePost/unsavePost), so opening read access here would leak
+    // other users' private bookmarks/emails. Public-safe author info for
+    // resolveAuthor() lives in the separate author_profiles collection below.
     match /users_metadata/{userId} {
       allow read: if isAuthenticated() && request.auth.uid == userId;
       allow read, write: if isAuthenticated() && isSuperAdmin(request.auth.uid);
@@ -131,6 +136,17 @@ service cloud.firestore {
       allow update: if isAuthenticated() && request.auth.uid == userId &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['role', 'selectedRole']);
+    }
+
+    // ===== AUTHOR_PROFILES =====
+    // Lightweight, intentionally public-safe index (uid/role/name/
+    // profileImageUrl only — nothing private) so resolveAuthor() can resolve
+    // any post's author with a single read instead of probing up to 5 role
+    // collections in sequence.
+    match /author_profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && isSuperAdmin(request.auth.uid);
     }
 
     // ===== READ-ONLY: Role collections (for author resolution) =====

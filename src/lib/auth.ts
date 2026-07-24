@@ -70,12 +70,22 @@ export async function createFeedsUser(user: User): Promise<FeedsUser> {
       email: user.email ?? "",
       lastLogin: now,
     }),
+    setDoc(doc(db, "author_profiles", user.uid), {
+      uid: user.uid,
+      role: "feeds_user",
+      name: user.displayName ?? "Anonymous",
+      profileImageUrl: user.photoURL ?? null,
+    }),
   ]);
 
   return feedsUser as unknown as FeedsUser;
 }
 
-export async function updateLastLogin(uid: string, role: UserRole) {
+export async function updateLastLogin(
+  uid: string,
+  role: UserRole,
+  profile?: { name?: string; profileImageUrl?: string | null }
+) {
   try {
     const collectionMap: Record<UserRole, string> = {
       superAdmin: "super_admins",
@@ -87,9 +97,22 @@ export async function updateLastLogin(uid: string, role: UserRole) {
     const col = collectionMap[role];
     await Promise.all([
       updateDoc(doc(db, col, uid), { lastLogin: serverTimestamp() }),
-      updateDoc(doc(db, "users_metadata", uid), {
-        lastLogin: serverTimestamp(),
-      }),
+      updateDoc(doc(db, "users_metadata", uid), { lastLogin: serverTimestamp() }).catch(() => {}),
+      // setDoc + merge (not updateDoc) so this self-heals: admin/student/guardian
+      // accounts (created via the Flutter app) never had a public profile doc
+      // to begin with. Backfilling role/name/profileImageUrl here means
+      // resolveAuthor() can resolve any author with a single read instead of
+      // probing up to 5 role collections in sequence.
+      setDoc(
+        doc(db, "author_profiles", uid),
+        {
+          uid,
+          role,
+          ...(profile?.name !== undefined ? { name: profile.name } : {}),
+          ...(profile?.profileImageUrl !== undefined ? { profileImageUrl: profile.profileImageUrl } : {}),
+        },
+        { merge: true }
+      ),
     ]);
   } catch {
     // Non-critical — don't block sign-in

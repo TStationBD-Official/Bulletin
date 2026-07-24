@@ -8,6 +8,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useAdminPendingCount } from "@/hooks/useAdminStats";
 import { useSettings } from "@/hooks/useSettings";
 import DynamicStyles from "@/components/DynamicStyles";
+import AdRepositioner from "@/components/AdRepositioner";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +35,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       <AuthProvider>
         {children}
         <Toaster position="bottom-right" />
+        <AdRepositioner />
       </AuthProvider>
     </QueryClientProvider>
   );

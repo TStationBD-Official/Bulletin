@@ -87,8 +87,7 @@ export default function AuthorPage() {
             )}
           </motion.div>
 
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-primary mb-1">{author.name}</h1>
-          <p className="text-sm text-gray-500 dark:text-dark-tertiary mb-5 sm:mb-6">{author.email}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-primary mb-5 sm:mb-6">{author.name}</h1>
 
           <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
             <div>
